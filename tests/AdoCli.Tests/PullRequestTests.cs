@@ -1,8 +1,10 @@
 namespace AdoCli.Tests;
 
 using System.Net;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using AdoCli.Api;
+using AdoCli.Cli;
 
 public class PullRequestTests
 {
@@ -79,6 +81,33 @@ public class PullRequestTests
 
         Assert.Equal(HttpMethod.Patch, stub.Requests[1].Method);
         AssertJson("""{"status":"completed","lastMergeSourceCommit":{"commitId":"abc"},"completionOptions":{"squashMerge":true}}""", stub.Requests[1].Body);
+    }
+
+    [Fact]
+    public async Task ListsChangedFilesBetweenMergeCommits()
+    {
+        var stub = new StubHandler(HttpStatusCode.OK, """
+            {"changes":[{"item":{"path":"/src/b.cs"},"changeType":"edit"},{"item":{"path":"/src","isFolder":true},"changeType":"edit"},
+                        {"item":{"path":"/a.cs"},"changeType":"rename","originalPath":"/old.cs"}]}
+            """);
+        var pr = JsonSerializer.Deserialize<PullRequest>(Pr, Json.Options)!;
+
+        var changes = await new AdoClient("https://tfs", "pat", handler: stub).GetPullRequestChangesAsync(pr);
+
+        Assert.Equal("https://tfs/Platform/_apis/git/repositories/22222222-2222-2222-2222-222222222222/diffs/commits" +
+            "?baseVersion=def&baseVersionType=commit&targetVersion=abc&targetVersionType=commit&$top=2000&api-version=5.0", stub.Requests[0].Url);
+        Assert.Equal([new Change("/a.cs", "rename", "/old.cs"), new Change("/src/b.cs", "edit", null)], changes);
+    }
+
+    [Fact]
+    public async Task SkipsWorkItemsThatAreNotVisible()
+    {
+        var stub = new StubHandler(HttpStatusCode.OK, """{"value":[{"id":1,"fields":{}},null]}""");
+
+        var items = await new AdoClient("https://tfs", "pat", handler: stub).GetWorkItemsAsync([1, 2]);
+
+        Assert.EndsWith("ids=1,2&fields=System.Title,System.WorkItemType,System.State&errorPolicy=omit&api-version=5.0", stub.Requests[0].Url);
+        Assert.Equal(1, items.Single().Id);
     }
 
     static void AssertJson(string expected, string? actual) =>

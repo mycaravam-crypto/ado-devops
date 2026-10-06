@@ -80,6 +80,24 @@ public sealed class AdoClient
     string PullRequestUrl(PullRequest pr, string suffix = "") =>
         Url(pr.Repository.Project.Name, $"git/repositories/{pr.Repository.Id}/pullrequests/{pr.PullRequestId}{suffix}");
 
+    public async Task<List<Commit>> GetPullRequestCommitsAsync(PullRequest pr) =>
+        (await SendAsync<ListResponse<Commit>>(HttpMethod.Get, PullRequestUrl(pr, "/commits"))).Value;
+
+    public async Task<List<int>> GetPullRequestWorkItemIdsAsync(PullRequest pr) =>
+        (await SendAsync<ListResponse<ResourceRef>>(HttpMethod.Get, PullRequestUrl(pr, "/workitems"))).Value.Select(r => int.Parse(r.Id)).Order().ToList();
+
+    /// <summary>Files changed between the merge base of target and source, like git diff target...source; empty until the server computed merge commits.</summary>
+    public async Task<List<Change>> GetPullRequestChangesAsync(PullRequest pr)
+    {
+        if (pr.LastMergeSourceCommit is null || pr.LastMergeTargetCommit is null)
+            return [];
+        // ponytail: one page of 2000 changes; page with $skip if bigger PRs matter
+        var query = $"baseVersion={pr.LastMergeTargetCommit.CommitId}&baseVersionType=commit" +
+            $"&targetVersion={pr.LastMergeSourceCommit.CommitId}&targetVersionType=commit&$top=2000";
+        var diffs = await SendAsync<CommitDiffs>(HttpMethod.Get, Url(pr.Repository.Project.Name, $"git/repositories/{pr.Repository.Id}/diffs/commits", query));
+        return diffs.Changes.Where(c => !c.Item.IsFolder).Select(c => new Change(c.Item.Path, c.ChangeType, c.OriginalPath)).OrderBy(c => c.Path, StringComparer.Ordinal).ToList();
+    }
+
     public Task<WorkItem> GetWorkItemAsync(int id) =>
         SendAsync<WorkItem>(HttpMethod.Get, Url(null, $"wit/workitems/{id}"));
 
@@ -90,12 +108,17 @@ public sealed class AdoClient
         var wiql = "SELECT [System.Id] FROM WorkItems WHERE [System.AssignedTo] = @Me AND [System.State] NOT IN ('Closed', 'Done', 'Removed')"
             + inProject + " ORDER BY [System.ChangedDate] DESC";
         var result = await SendAsync<WiqlResult>(HttpMethod.Post, Url(project, "wit/wiql", "$top=50"), new { query = wiql });
-        if (result.WorkItems.Count == 0)
-            return [];
+        return await GetWorkItemsAsync(result.WorkItems.Select(w => w.Id));
+    }
 
-        var ids = string.Join(',', result.WorkItems.Select(w => w.Id));
-        var query = $"ids={ids}&fields=System.Title,System.WorkItemType,System.State";
-        return (await SendAsync<ListResponse<WorkItem>>(HttpMethod.Get, Url(null, "wit/workitems", query))).Value;
+    /// <summary>Title, type and state of the given work items; ones that are deleted or not visible are left out.</summary>
+    public async Task<List<WorkItem>> GetWorkItemsAsync(IEnumerable<int> ids)
+    {
+        var list = string.Join(',', ids);
+        if (list.Length == 0)
+            return [];
+        var query = $"ids={list}&fields=System.Title,System.WorkItemType,System.State&errorPolicy=omit";
+        return (await SendAsync<ListResponse<WorkItem?>>(HttpMethod.Get, Url(null, "wit/workitems", query))).Value.OfType<WorkItem>().ToList();
     }
 
     public async Task<List<Build>> GetBuildsAsync(string project) =>

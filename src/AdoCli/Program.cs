@@ -24,7 +24,8 @@ public static class Program
 
           pr list                   list pull requests of the project/repository [--mine] [--status active|completed|abandoned|all]
           pr show <id>              show a pull request
-          pr diff <id>              show the changes of a pull request (uses git)
+          pr context <id>           pull request with commits, changed files and work items, as JSON
+          pr diff <id>              show the changes of a pull request (uses git; --json lists changed files)
           pr checkout <id>          check out a pull request as local branch pr/<id>
           pr create                 create a pull request (prompts, or --title --description --source --target)
           pr approve <id>           approve a pull request
@@ -93,6 +94,7 @@ public static class Program
             ("repo", "status") => RepoCommands.StatusAsync(ctx),
             ("pr", "list") => PrCommands.ListAsync(ctx),
             ("pr", "show") => PrCommands.ShowAsync(ctx),
+            ("pr", "context") => PrCommands.ContextAsync(ctx),
             ("pr", "diff") => PrCommands.DiffAsync(ctx),
             ("pr", "checkout") => PrCommands.CheckoutAsync(ctx),
             ("pr", "create") => PrCommands.CreateAsync(ctx),

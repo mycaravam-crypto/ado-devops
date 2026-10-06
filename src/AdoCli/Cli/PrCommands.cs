@@ -35,6 +35,7 @@ public static class PrCommands
             Target:     {Output.Branch(pr.TargetRefName)}
             Source:     {Output.Branch(pr.SourceRefName)}
             """);
+        Console.WriteLine($"Changes:    {(await ctx.Client.GetPullRequestChangesAsync(pr)).Count} files");
         if (!string.IsNullOrWhiteSpace(pr.Description))
             Console.WriteLine($"\nDescription:\n{pr.Description}");
         if (pr.Reviewers is { Count: > 0 } reviewers)
@@ -46,8 +47,21 @@ public static class PrCommands
         return 0;
     }
 
+    /// <summary>Everything needed to understand a PR, as one JSON document. Always JSON.</summary>
+    public static async Task<int> ContextAsync(Context ctx)
+    {
+        var pr = await ctx.Client.GetPullRequestAsync(Id(ctx, "context"));
+        var commits = ctx.Client.GetPullRequestCommitsAsync(pr);
+        var changes = ctx.Client.GetPullRequestChangesAsync(pr);
+        var workItems = ctx.Client.GetWorkItemsAsync(await ctx.Client.GetPullRequestWorkItemIdsAsync(pr));
+        return Output.WriteJson(new { pullRequest = pr, commits = await commits, changes = await changes, workItems = await workItems });
+    }
+
     public static async Task<int> DiffAsync(Context ctx)
     {
+        if (ctx.Json)
+            return Output.WriteJson(await ctx.Client.GetPullRequestChangesAsync(await ctx.Client.GetPullRequestAsync(Id(ctx, "diff"))));
+
         var pr = await GetInCurrentRepoAsync(ctx, "diff");
         if (pr.LastMergeSourceCommit is null || pr.LastMergeTargetCommit is null)
             throw new AdoException($"PR #{pr.PullRequestId} has no merge commits to compare yet");

@@ -20,6 +20,21 @@ public sealed record Reviewer(string DisplayName, int Vote);
 
 public sealed record CommitRef(string CommitId);
 
+public sealed record GitUser(string Name, DateTime Date);
+
+public sealed record Commit(string CommitId, string? Comment, GitUser? Author);
+
+public sealed record GitItem(string Path, bool IsFolder);
+
+public sealed record GitChange(GitItem Item, string ChangeType, string? OriginalPath);
+
+public sealed record CommitDiffs(List<GitChange> Changes);
+
+/// <summary>A changed file; <see cref="OriginalPath"/> is set for renames.</summary>
+public sealed record Change(string Path, string ChangeType, string? OriginalPath);
+
+public sealed record ResourceRef(string Id);
+
 public sealed record PullRequest(
     int PullRequestId,
     string Title,

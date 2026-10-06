@@ -31,6 +31,7 @@ In CI, pipe the token in: `echo "$PAT" | ado auth login <server-url>`, or skip l
 ado repo list | show [<repo>] | clone <repo> [dir] | status
 ado pr list [--mine] [--status active|completed|abandoned|all]
 ado pr show | diff | checkout | approve <id>
+ado pr context <id>          # PR, commits, changed files, work items as JSON
 ado pr create [--title t --description d --source branch --target branch]
 ado pr merge <id> [--squash] [--yes]
 ado workitem list | show <id>

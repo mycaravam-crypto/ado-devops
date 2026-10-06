@@ -25,23 +25,83 @@ ado auth logout
 
 In CI, pipe the token in: `echo "$PAT" | ado auth login <server-url>`, or skip login and set environment variables (below).
 
-## Common commands
+## Repositories
 
-```text
-ado repo list | show [<repo>] | clone <repo> [dir] | status
-ado pr list [--mine] [--status active|completed|abandoned|all]
-ado pr show | diff | checkout | approve <id>
-ado pr context <id>          # PR, commits, changed files, work items as JSON
-ado pr create [--title t --description d --source branch --target branch]
-ado pr merge <id> [--squash] [--yes]
-ado workitem list | show <id>
-ado build list | show <id> | run <definition-id> [--branch b]
+```bash
+ado repo list                 # repositories of the current project (all, if unknown)
+ado repo show [<repo>]
+ado repo clone <repo> [dir]
+ado repo status               # server/project/repo of the current clone (no network call)
 ```
 
-Every list/show command accepts `--json`. `--debug` logs each HTTP request (method, URL, status, timing — never credentials).
-Run `ado --help` for the full list.
+## Pull requests
 
-Exit codes: `0` success, `1` failure, `2` invalid usage, `3` authentication, `4` permission, `5` not found, `6` conflict.
+```bash
+ado pr list [--mine] [--status active|completed|abandoned|all]
+ado pr show 142
+ado pr checkout 142           # local branch pr/142; refuses to run on a dirty tree
+ado pr diff 142               # git diff target...source
+ado pr approve 142
+ado pr merge 142 [--squash] [--yes]
+ado pr create                 # prompts; or --title t [--description d] [--source b] [--target b]
+```
+
+## Work items
+
+```bash
+ado workitem list             # open items assigned to you
+ado workitem show 4711
+```
+
+## Builds
+
+```bash
+ado build list
+ado build show 815
+ado build run <definition-id> [--branch b]
+```
+
+## JSON
+
+`--json` makes data commands print JSON on stdout. Messages, prompts and errors go to stderr, so stdout is always
+either JSON or empty (`auth` commands print plain text only). `ado pr context <id>` always prints JSON.
+
+```bash
+ado pr list --json | jq '.[].pullRequestId'
+```
+
+`--debug` logs each HTTP request to stderr (method, URL, status, timing; never credentials).
+
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| 0 | success |
+| 1 | general failure (including git failures and an aborted merge) |
+| 2 | invalid command or arguments |
+| 3 | authentication failure / not logged in |
+| 4 | permission denied |
+| 5 | not found |
+| 6 | conflict |
+
+`--json` does not change exit codes.
+
+## Using `ado` as a local automation/AI tool interface
+
+`ado` contains no AI. It is deterministic: the same server state gives the same output, and JSON lists are sorted
+where the server does not fix the order. That makes it a safe tool for scripts and local agents, which can
+work from JSON and exit codes alone:
+
+```bash
+ado repo status --json        # where am I?
+ado pr context 142 --json     # PR, reviewers, commits, changed files, linked work items
+ado pr diff 142 --json        # changed files; without --json, the full unified diff
+ado workitem show 4711 --json
+ado build show 815 --json
+```
+
+Commands that change state (`pr create`, `pr approve`, `pr merge`, `build run`) never prompt when given
+`--title` / `--yes`. Credentials never appear in any output.
 
 ## Configuration
 
@@ -56,24 +116,6 @@ Exit codes: `0` success, `1` failure, `2` invalid usage, `3` authentication, `4`
 
 Inside a clone of an Azure DevOps repository, project and repository are taken from the `origin` remote,
 so most commands need no arguments. Elsewhere, pass `--project <name>` and `--repo <name>`.
-
-## Examples
-
-```bash
-ado auth login https://tfs.company.local/tfs/DefaultCollection
-ado repo list
-ado repo clone connector && cd connector
-
-ado pr list
-ado pr show 142
-ado pr checkout 142        # local branch pr/142
-ado pr diff 142
-ado pr approve 142
-ado pr merge 142
-
-ado pr create --title "Fix import validation" --target main
-ado pr list --json | jq '.[].pullRequestId'
-```
 
 ## Development
 

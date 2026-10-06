@@ -28,7 +28,7 @@ In CI, pipe the token in: `echo "$PAT" | ado auth login <server-url>`, or skip l
 ## Common commands
 
 ```text
-ado repo list | show [<repo>] | clone <repo> [dir]
+ado repo list | show [<repo>] | clone <repo> [dir] | status
 ado pr list [--mine] [--status active|completed|abandoned|all]
 ado pr show | diff | checkout | approve <id>
 ado pr create [--title t --description d --source branch --target branch]

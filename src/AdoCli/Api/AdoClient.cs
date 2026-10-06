@@ -60,11 +60,31 @@ public sealed class AdoClient
     public Task<PullRequest> GetPullRequestAsync(int id) =>
         SendAsync<PullRequest>(HttpMethod.Get, Url(null, $"git/pullrequests/{id}"));
 
+    public Task<PullRequest> CreatePullRequestAsync(string project, string repo, string source, string target, string title, string description) =>
+        SendAsync<PullRequest>(HttpMethod.Post, Url(project, $"git/repositories/{Uri.EscapeDataString(repo)}/pullrequests"),
+            new { sourceRefName = source, targetRefName = target, title, description });
+
+    /// <summary>Sets the vote of <paramref name="reviewerId"/>; 10 = approve.</summary>
+    public Task<Reviewer> VoteAsync(PullRequest pr, Guid reviewerId, int vote) =>
+        SendAsync<Reviewer>(HttpMethod.Put, PullRequestUrl(pr, $"/reviewers/{reviewerId}"), new { vote });
+
+    /// <summary>Completes (merges) the PR at the source commit the caller saw.</summary>
+    public Task<PullRequest> CompletePullRequestAsync(PullRequest pr, bool squash) =>
+        SendAsync<PullRequest>(HttpMethod.Patch, PullRequestUrl(pr), new
+        {
+            status = "completed",
+            lastMergeSourceCommit = pr.LastMergeSourceCommit,
+            completionOptions = new { squashMerge = squash },
+        });
+
+    string PullRequestUrl(PullRequest pr, string suffix = "") =>
+        Url(pr.Repository.Project.Name, $"git/repositories/{pr.Repository.Id}/pullrequests/{pr.PullRequestId}{suffix}");
+
     public async Task<T> SendAsync<T>(HttpMethod method, string url, object? body = null)
     {
         using var request = new HttpRequestMessage(method, url);
         if (body is not null)
-            request.Content = JsonContent.Create(body, options: Json.Options);
+            request.Content = new StringContent(JsonSerializer.Serialize(body, Json.Options), Encoding.UTF8, "application/json");
 
         var sw = Stopwatch.StartNew();
         using var response = await _http.SendAsync(request);

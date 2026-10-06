@@ -11,21 +11,23 @@ using AdoCli.Cli;
 /// <summary>The one Azure DevOps Server REST client. All URLs are built by <see cref="Url"/>.</summary>
 public sealed class AdoClient
 {
-    /// <summary>Supported by Azure DevOps Server 2019 and later.</summary>
-    public const string ApiVersion = "5.0";
+    /// <summary>Supported by Azure DevOps Server 2019 and later; every command works with it.</summary>
+    public const string DefaultApiVersion = "5.0";
 
     readonly HttpClient _http;
     readonly string _server;
+    readonly string _apiVersion;
     readonly bool _debug;
 
     public const string CredentialsInUrl = "the server URL must not contain credentials; log in with a personal access token instead";
 
-    public AdoClient(string server, string pat, bool debug = false, HttpMessageHandler? handler = null)
+    public AdoClient(string server, string pat, bool debug = false, HttpMessageHandler? handler = null, string apiVersion = DefaultApiVersion)
     {
         // Every URL is built from the server and printed by --debug, so it must not carry a secret.
         if (Uri.TryCreate(server, UriKind.Absolute, out var uri) && uri.UserInfo.Length > 0)
             throw AdoException.Usage(CredentialsInUrl);
         _server = server.TrimEnd('/');
+        _apiVersion = apiVersion;
         _debug = debug;
         _http = new HttpClient(handler ?? new HttpClientHandler()) { Timeout = TimeSpan.FromSeconds(60) };
         _http.DefaultRequestHeaders.Authorization =
@@ -39,7 +41,7 @@ public sealed class AdoClient
     {
         var scope = project is null ? "" : "/" + Uri.EscapeDataString(project);
         var q = query.Length > 0 ? query + "&" : "";
-        return $"{_server}{scope}/_apis/{path}?{q}api-version={ApiVersion}";
+        return $"{_server}{scope}/_apis/{path}?{q}api-version={_apiVersion}";
     }
 
     // connectionData only exists as a preview API, so it is called without api-version.
@@ -157,12 +159,15 @@ public sealed class AdoClient
 
     static AdoException AuthFailed() => new("authentication failed.\n\nRun:\n  ado auth login", AdoException.Auth);
 
-    static async Task<AdoException> ErrorAsync(HttpResponseMessage response)
+    async Task<AdoException> ErrorAsync(HttpResponseMessage response)
     {
         var code = (int)response.StatusCode;
-        var detail = await DetailAsync(response);
+        var body = await response.Content.ReadAsStringAsync();
+        var detail = Detail(body);
         return code switch
         {
+            400 when body.Contains("VssVersionOutOfRangeException") =>
+                new($"the server does not support REST API version {_apiVersion}{detail}\n\nSet ADO_API_VERSION (or \"apiVersion\" in ~/.ado/config.json) to a version it supports, e.g. {DefaultApiVersion}."),
             401 => AuthFailed(),
             403 => new($"permission denied{detail}", AdoException.Permission),
             404 => new($"not found{detail}", AdoException.NotFound),
@@ -174,11 +179,11 @@ public sealed class AdoClient
     }
 
     /// <summary>Azure DevOps error bodies look like {"message": "..."}.</summary>
-    static async Task<string> DetailAsync(HttpResponseMessage response)
+    static string Detail(string body)
     {
         try
         {
-            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            using var doc = JsonDocument.Parse(body);
             return doc.RootElement.TryGetProperty("message", out var m) ? ": " + m.GetString() : "";
         }
         catch (JsonException)

@@ -12,16 +12,19 @@ public class ConfigTests
         try
         {
             Environment.SetEnvironmentVariable("ADO_PROJECT", "FromEnv");
+            Environment.SetEnvironmentVariable("ADO_API_VERSION", "6.0");
             var c = Config.Load(path);
 
             Assert.Equal("https://tfs/tfs/DefaultCollection", c.Server);
             Assert.Equal("secret", c.Pat);
             Assert.Equal("FromEnv", c.Project);
+            Assert.Equal("6.0", c.ApiVersion);
             Assert.DoesNotContain("secret", c.ToString());
         }
         finally
         {
             Environment.SetEnvironmentVariable("ADO_PROJECT", null);
+            Environment.SetEnvironmentVariable("ADO_API_VERSION", null);
             File.Delete(path);
         }
     }

@@ -20,6 +20,7 @@ public static class Program
           repo list                 list repositories (of the current project, if known)
           repo show [<repo>]        show repository details
           repo clone <repo> [dir]   clone a repository with git
+          repo status               show the Azure DevOps repository of the current directory
 
           pr list                   list pull requests of the project/repository [--mine] [--status active|completed|abandoned|all]
           pr show <id>              show a pull request
@@ -89,6 +90,7 @@ public static class Program
             ("repo", "list") => RepoCommands.ListAsync(ctx),
             ("repo", "show") => RepoCommands.ShowAsync(ctx),
             ("repo", "clone") => RepoCommands.CloneAsync(ctx),
+            ("repo", "status") => RepoCommands.StatusAsync(ctx),
             ("pr", "list") => PrCommands.ListAsync(ctx),
             ("pr", "show") => PrCommands.ShowAsync(ctx),
             ("pr", "diff") => PrCommands.DiffAsync(ctx),

@@ -40,6 +40,25 @@ public static class RepoCommands
         return GitClient.Run(args, capture: false).ExitCode;
     }
 
+    /// <summary>What the origin remote says, without calling the server. SSH remotes carry no server URL and are assumed to be the configured one.</summary>
+    public static Task<int> StatusAsync(Context ctx)
+    {
+        var remote = ctx.Remote ?? throw new AdoException("not inside a clone of an Azure DevOps repository (no matching origin remote)");
+        var configured = ctx.Config.Server is { } s && (remote.Server is null || string.Equals(remote.Server, s.TrimEnd('/'), StringComparison.OrdinalIgnoreCase));
+        var server = remote.Server ?? ctx.Config.Server;
+        if (ctx.Json)
+            return Task.FromResult(Output.WriteJson(new { server, project = remote.Project, repository = remote.Repo, configured }));
+
+        Console.WriteLine($"""
+            Server:     {server}
+            Project:    {remote.Project}
+            Repository: {remote.Repo}
+            """);
+        if (!configured)
+            Console.Error.WriteLine("\nWarning: this is not the configured server; run 'ado auth login <server-url>' for it.");
+        return Task.FromResult(0);
+    }
+
     static Task<Repository> GetAsync(Context ctx) =>
         ctx.Client.GetRepositoryAsync(ctx.RequireProject(), ctx.Args.At(2) ?? ctx.RequireRepo());
 }

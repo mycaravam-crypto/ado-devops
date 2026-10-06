@@ -4,7 +4,11 @@ using System.Text.Json;
 
 public static class Json
 {
-    public static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web) { WriteIndented = true };
+    public static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+    };
 }
 
 public static class Term
@@ -79,4 +83,6 @@ public static class Output
     public static string Truncate(string s, int max) => s.Length <= max ? s : s[..(max - 1)] + "…";
 
     public static string Branch(string? refName) => refName?.Replace("refs/heads/", "") ?? "";
+
+    public static string Ref(string branch) => branch.StartsWith("refs/") ? branch : "refs/heads/" + branch;
 }

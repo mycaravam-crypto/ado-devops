@@ -32,6 +32,10 @@ public static class Program
           workitem list             list open work items assigned to you
           workitem show <id>        show a work item
 
+          build list                list recent builds of the project
+          build show <id>           show a build
+          build run <definition-id> queue a build [--branch <branch>]
+
         Inside a cloned Azure DevOps repository, project and repository are detected
         from the origin remote. Otherwise pass --project <name> and --repo <name>,
         or set a default project with ADO_PROJECT.
@@ -99,6 +103,9 @@ public static class Program
             ("pr", "merge") => PrCommands.MergeAsync(ctx),
             ("workitem", "list") => WorkItemCommands.ListAsync(ctx),
             ("workitem", "show") => WorkItemCommands.ShowAsync(ctx),
+            ("build", "list") => BuildCommands.ListAsync(ctx),
+            ("build", "show") => BuildCommands.ShowAsync(ctx),
+            ("build", "run") => BuildCommands.RunAsync(ctx),
             _ => throw AdoException.Usage($"unknown command '{string.Join(' ', a.Positional.Take(2))}'. Run 'ado --help'."),
         };
     }

@@ -96,7 +96,7 @@ public static class PrCommands
         if (title.Length == 0)
             throw AdoException.Usage("a title is required");
 
-        var pr = await ctx.Client.CreatePullRequestAsync(project, repo, Ref(source), Ref(target), title, description);
+        var pr = await ctx.Client.CreatePullRequestAsync(project, repo, Output.Ref(source), Output.Ref(target), title, description);
         if (ctx.Json)
             return Output.WriteJson(pr);
         Console.WriteLine($"Created PR #{pr.PullRequestId}: {pr.Title}");
@@ -145,8 +145,6 @@ public static class PrCommands
         Output.Branch((await ctx.Client.GetRepositoryAsync(project, repo)).DefaultBranch) is { Length: > 0 } b
             ? b
             : throw AdoException.Usage("repository has no default branch; pass --target <branch>");
-
-    static string Ref(string branch) => branch.StartsWith("refs/") ? branch : "refs/heads/" + branch;
 
     /// <summary>An existing local branch is only fast-forwarded, so local commits on it are never lost.</summary>
     public static string[][] CheckoutCommands(string branch, string sourceRef, bool branchExists) => branchExists

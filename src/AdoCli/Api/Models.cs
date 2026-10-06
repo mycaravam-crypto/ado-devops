@@ -1,6 +1,7 @@
 namespace AdoCli.Api;
 
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 public sealed record ConnectionData(Identity AuthenticatedUser);
 
@@ -47,3 +48,19 @@ public sealed record WorkItem(int Id, Dictionary<string, JsonElement> Fields)
 public sealed record WorkItemRef(int Id);
 
 public sealed record WiqlResult(List<WorkItemRef> WorkItems);
+
+public sealed record DefinitionRef(int Id, string Name);
+
+public sealed record Link(string Href);
+
+public sealed record BuildLinks(Link? Web);
+
+public sealed record Build(
+    int Id,
+    string BuildNumber,
+    string Status,
+    string? Result,
+    DefinitionRef Definition,
+    string? SourceBranch,
+    IdentityRef? RequestedFor,
+    [property: JsonPropertyName("_links")] BuildLinks? Links);

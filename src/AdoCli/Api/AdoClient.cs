@@ -98,6 +98,16 @@ public sealed class AdoClient
         return (await SendAsync<ListResponse<WorkItem>>(HttpMethod.Get, Url(null, "wit/workitems", query))).Value;
     }
 
+    public async Task<List<Build>> GetBuildsAsync(string project) =>
+        (await SendAsync<ListResponse<Build>>(HttpMethod.Get, Url(project, "build/builds", "queryOrder=queueTimeDescending&$top=20"))).Value;
+
+    public Task<Build> GetBuildAsync(string project, int id) =>
+        SendAsync<Build>(HttpMethod.Get, Url(project, $"build/builds/{id}"));
+
+    /// <summary>Queues a build of a definition; without a branch the definition's default branch is built.</summary>
+    public Task<Build> QueueBuildAsync(string project, int definitionId, string? sourceBranch) =>
+        SendAsync<Build>(HttpMethod.Post, Url(project, "build/builds"), new { definition = new { id = definitionId }, sourceBranch });
+
     public async Task<T> SendAsync<T>(HttpMethod method, string url, object? body = null)
     {
         using var request = new HttpRequestMessage(method, url);

@@ -41,6 +41,12 @@ public sealed class AdoClient
     public Task<ConnectionData> GetConnectionDataAsync() =>
         SendAsync<ConnectionData>(HttpMethod.Get, $"{_server}/_apis/connectionData");
 
+    public async Task<List<Repository>> GetRepositoriesAsync(string? project) =>
+        (await SendAsync<ListResponse<Repository>>(HttpMethod.Get, Url(project, "git/repositories"))).Value;
+
+    public Task<Repository> GetRepositoryAsync(string project, string repo) =>
+        SendAsync<Repository>(HttpMethod.Get, Url(project, $"git/repositories/{Uri.EscapeDataString(repo)}"));
+
     public async Task<T> SendAsync<T>(HttpMethod method, string url, object? body = null)
     {
         using var request = new HttpRequestMessage(method, url);

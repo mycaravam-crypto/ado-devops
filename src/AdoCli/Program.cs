@@ -17,7 +17,16 @@ public static class Program
           auth status               show login state
           auth logout               remove stored credentials
 
+          repo list                 list repositories (of the current project, if known)
+          repo show [<repo>]        show repository details
+          repo clone <repo> [dir]   clone a repository with git
+
+        Inside a cloned Azure DevOps repository, project and repository are detected
+        from the origin remote. Otherwise pass --project <name> and --repo <name>,
+        or set a default project with ADO_PROJECT.
+
         Global flags:
+          --json      machine-readable output
           --debug     log HTTP requests and show stack traces
           --help      show this help
           --version   show version
@@ -67,6 +76,9 @@ public static class Program
             ("auth", "login") => AuthCommands.LoginAsync(ctx),
             ("auth", "status") => AuthCommands.StatusAsync(ctx),
             ("auth", "logout") => AuthCommands.LogoutAsync(ctx),
+            ("repo", "list") => RepoCommands.ListAsync(ctx),
+            ("repo", "show") => RepoCommands.ShowAsync(ctx),
+            ("repo", "clone") => RepoCommands.CloneAsync(ctx),
             _ => throw AdoException.Usage($"unknown command '{string.Join(' ', a.Positional.Take(2))}'. Run 'ado --help'."),
         };
     }

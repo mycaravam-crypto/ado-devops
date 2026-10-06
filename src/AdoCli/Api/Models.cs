@@ -1,5 +1,7 @@
 namespace AdoCli.Api;
 
+using System.Text.Json;
+
 public sealed record ConnectionData(Identity AuthenticatedUser);
 
 public sealed record Identity(Guid Id, string ProviderDisplayName);
@@ -29,3 +31,19 @@ public sealed record PullRequest(
     CommitRef? LastMergeSourceCommit,
     CommitRef? LastMergeTargetCommit,
     List<Reviewer>? Reviewers);
+
+/// <summary>Work item fields are kept raw: their set and shape depend on the process template.</summary>
+public sealed record WorkItem(int Id, Dictionary<string, JsonElement> Fields)
+{
+    /// <summary>A field as text; identity fields (objects since Server 2019) yield their display name.</summary>
+    public string Field(string name) => Fields.GetValueOrDefault(name) switch
+    {
+        { ValueKind: JsonValueKind.Object } o when o.TryGetProperty("displayName", out var n) => n.GetString() ?? "",
+        { ValueKind: JsonValueKind.Undefined or JsonValueKind.Null } => "",
+        var v => v.ToString(),
+    };
+}
+
+public sealed record WorkItemRef(int Id);
+
+public sealed record WiqlResult(List<WorkItemRef> WorkItems);

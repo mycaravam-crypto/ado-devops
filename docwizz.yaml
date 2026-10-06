@@ -1,0 +1,22 @@
+# docwizz (https://github.com/mycaravam-crypto/docwizz): documentation and architecture gate for pull requests.
+# The PR workflow runs `docwizz check --since <base>`, so it fails only on problems a change introduces.
+profile: default
+check:
+  min_coverage: 80
+  max_critical: 0
+  max_violations: 0
+  max_cycles: 0
+  fail_on: medium       # minimum violation severity that fails check: low, medium, high
+architecture:
+  layers:               # path globs, first match wins; Program.cs, Args.cs and Config.cs have no layer
+    cli: ["*/AdoCli/Cli/*.cs"]
+    api: ["*/AdoCli/Api/*.cs"]
+    git: ["*/AdoCli/Git/*.cs"]
+  allow:                # commands use the REST client and Git; the clients never call back into commands
+    cli: [api, git]
+    git: [api]          # GitClient throws AdoException
+    api: []
+security:
+  enabled: false
+tests: ["tests/*"]
+comment_docs: true      # this codebase explains itself in // comments as well as /// XML docs

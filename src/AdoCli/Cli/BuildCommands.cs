@@ -17,6 +17,7 @@ public static class BuildCommands
         return 0;
     }
 
+    /// <summary>ado build show &lt;id&gt;: one build of the current project.</summary>
     public static async Task<int> ShowAsync(Context ctx)
     {
         var b = await ctx.Client.GetBuildAsync(ctx.RequireProject(), ctx.Id("build show <id>"));
@@ -35,6 +36,7 @@ public static class BuildCommands
         return 0;
     }
 
+    /// <summary>ado build run &lt;definition-id&gt;: queues a build, of --branch or the definition's default branch.</summary>
     public static async Task<int> RunAsync(Context ctx)
     {
         var branch = ctx.Args.Get("--branch") is { } name ? Output.Ref(name) : null;

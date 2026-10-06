@@ -64,9 +64,11 @@ public sealed class AdoClient
         return (await SendAsync<ListResponse<PullRequest>>(HttpMethod.Get, Url(project, path, query))).Value;
     }
 
+    /// <summary>A pull request by id; ids are unique per collection, so no project or repository is needed.</summary>
     public Task<PullRequest> GetPullRequestAsync(int id) =>
         SendAsync<PullRequest>(HttpMethod.Get, Url(null, $"git/pullrequests/{id}"));
 
+    /// <summary>Creates a pull request; <paramref name="source"/> and <paramref name="target"/> are full refs (refs/heads/...).</summary>
     public Task<PullRequest> CreatePullRequestAsync(string project, string repo, string source, string target, string title, string description) =>
         SendAsync<PullRequest>(HttpMethod.Post, Url(project, $"git/repositories/{Uri.EscapeDataString(repo)}/pullrequests"),
             new { sourceRefName = source, targetRefName = target, title, description });
@@ -138,6 +140,7 @@ public sealed class AdoClient
     public Task<Build> QueueBuildAsync(string project, int definitionId, string? sourceBranch) =>
         SendAsync<Build>(HttpMethod.Post, Url(project, "build/builds"), new { definition = new { id = definitionId }, sourceBranch });
 
+    /// <summary>Sends one request and deserializes the JSON answer; HTTP errors and rejected credentials become an <see cref="AdoException"/> with a matching exit code.</summary>
     public async Task<T> SendAsync<T>(HttpMethod method, string url, object? body = null)
     {
         using var request = new HttpRequestMessage(method, url);

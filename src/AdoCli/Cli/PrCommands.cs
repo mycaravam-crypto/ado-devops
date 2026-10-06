@@ -5,6 +5,7 @@ using AdoCli.Git;
 
 public static class PrCommands
 {
+    /// <summary>ado pr list: PRs of the repository (or project), active unless --status says otherwise; --mine keeps your own.</summary>
     public static async Task<int> ListAsync(Context ctx)
     {
         Guid? creator = ctx.Args.Has("--mine") ? (await ctx.Client.GetConnectionDataAsync()).AuthenticatedUser.Id : null;
@@ -19,6 +20,7 @@ public static class PrCommands
         return 0;
     }
 
+    /// <summary>ado pr show &lt;id&gt;: PR details with changed file count, description and reviewer votes.</summary>
     public static async Task<int> ShowAsync(Context ctx)
     {
         var pr = await ctx.Client.GetPullRequestAsync(ctx.Id("pr show <id>"));
@@ -57,6 +59,7 @@ public static class PrCommands
         return Output.WriteJson(new { pullRequest = pr, commits = await commits, changes = await changes, workItems = await workItems });
     }
 
+    /// <summary>ado pr diff &lt;id&gt;: git diff target...source in a clone of the PR's repository; with --json the changed files from the server.</summary>
     public static async Task<int> DiffAsync(Context ctx)
     {
         if (ctx.Json)
@@ -84,6 +87,7 @@ public static class PrCommands
         return 0;
     }
 
+    /// <summary>ado pr create: from --title/--description/--source/--target, or prompts when interactive; source defaults to the current branch, target to the default branch.</summary>
     public static async Task<int> CreateAsync(Context ctx)
     {
         var (project, repo) = (ctx.RequireProject(), ctx.RequireRepo());
@@ -124,6 +128,7 @@ public static class PrCommands
         return ctx.Json ? Output.WriteJson(reviewer) : 0;
     }
 
+    /// <summary>ado pr merge &lt;id&gt;: completes an active PR after confirmation (--yes skips it); the server may only queue completion until policies pass.</summary>
     public static async Task<int> MergeAsync(Context ctx)
     {
         var pr = await ctx.Client.GetPullRequestAsync(ctx.Id("pr merge <id>"));

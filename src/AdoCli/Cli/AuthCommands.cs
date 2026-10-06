@@ -4,6 +4,7 @@ using AdoCli.Api;
 
 public static class AuthCommands
 {
+    /// <summary>ado auth login: reads the PAT, checks it against the server and only then saves it, keeping the configured project and API version.</summary>
     public static async Task<int> LoginAsync(Context ctx)
     {
         var server = ctx.Args.At(2) ?? throw AdoException.Usage("usage: ado auth login <server-url>");
@@ -26,6 +27,7 @@ public static class AuthCommands
         return 0;
     }
 
+    /// <summary>ado auth status: shows the server and user; exits with <see cref="AdoException.Auth"/> when not logged in.</summary>
     public static async Task<int> StatusAsync(Context ctx)
     {
         if (ctx.Config.Server is null || ctx.Config.Pat is null)

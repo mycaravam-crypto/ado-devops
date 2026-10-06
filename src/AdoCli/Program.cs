@@ -51,6 +51,7 @@ public static class Program
 
     public static string Version { get; } = Assembly.GetExecutingAssembly().GetName().Version!.ToString(3);
 
+    /// <summary>Entry point: runs one command and turns every error into a message on stderr and an exit code.</summary>
     public static async Task<int> Main(string[] argv)
     {
         var debug = argv.Contains("--debug");
@@ -75,6 +76,7 @@ public static class Program
         }
     }
 
+    /// <summary>Dispatches &lt;command&gt; &lt;subcommand&gt; to its handler; --help and --version need no configuration.</summary>
     static Task<int> RunAsync(Args a)
     {
         if (a.Has("--version"))

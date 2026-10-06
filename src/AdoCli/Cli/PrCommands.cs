@@ -58,6 +58,25 @@ public static class PrCommands
         return GitClient.Run(["diff", $"{pr.LastMergeTargetCommit.CommitId}...{pr.LastMergeSourceCommit.CommitId}"], capture: false).ExitCode;
     }
 
+    public static async Task<int> CheckoutAsync(Context ctx)
+    {
+        var pr = await GetInCurrentRepoAsync(ctx, "checkout");
+        if (GitClient.Check("status", "--porcelain", "--untracked-files=no").Length > 0)
+            throw new AdoException("you have uncommitted changes; commit or stash them first");
+
+        var branch = $"pr/{pr.PullRequestId}";
+        var exists = GitClient.Run(["rev-parse", "--verify", "--quiet", $"refs/heads/{branch}"]).ExitCode == 0;
+        foreach (var args in CheckoutCommands(branch, pr.SourceRefName, exists))
+            GitClient.Check(args);
+        Console.WriteLine($"Switched to branch {branch} ({Output.Branch(pr.SourceRefName)})");
+        return 0;
+    }
+
+    /// <summary>An existing local branch is only fast-forwarded, so local commits on it are never lost.</summary>
+    public static string[][] CheckoutCommands(string branch, string sourceRef, bool branchExists) => branchExists
+        ? [["fetch", "--quiet", "origin", sourceRef], ["checkout", "--quiet", branch], ["merge", "--quiet", "--ff-only", "FETCH_HEAD"]]
+        : [["fetch", "--quiet", "origin", sourceRef], ["checkout", "--quiet", "-b", branch, "FETCH_HEAD"]];
+
     /// <summary>Loads a PR and checks that the current directory is a clone of its repository.</summary>
     static async Task<PullRequest> GetInCurrentRepoAsync(Context ctx, string verb)
     {

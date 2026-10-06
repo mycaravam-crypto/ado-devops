@@ -24,3 +24,21 @@ public class GitClientTests
         Assert.Null(GitClient.ParseRemote("git@github.com:me/repo.git", null));
     }
 }
+
+public class CheckoutCommandTests
+{
+    [Fact]
+    public void CreatesBranchFromFetchedSource()
+    {
+        Assert.Equal(
+            [["fetch", "--quiet", "origin", "refs/heads/feature/x"], ["checkout", "--quiet", "-b", "pr/142", "FETCH_HEAD"]],
+            AdoCli.Cli.PrCommands.CheckoutCommands("pr/142", "refs/heads/feature/x", branchExists: false));
+    }
+
+    [Fact]
+    public void OnlyFastForwardsExistingBranch()
+    {
+        var commands = AdoCli.Cli.PrCommands.CheckoutCommands("pr/142", "refs/heads/feature/x", branchExists: true);
+        Assert.Equal(["merge", "--quiet", "--ff-only", "FETCH_HEAD"], commands[^1]);
+    }
+}

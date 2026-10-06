@@ -21,8 +21,7 @@ public static partial class WorkItemCommands
 
     public static async Task<int> ShowAsync(Context ctx)
     {
-        var id = int.TryParse(ctx.Args.At(2), out var i) ? i : throw AdoException.Usage("usage: ado workitem show <id>");
-        var w = await ctx.Client.GetWorkItemAsync(id);
+        var w = await ctx.Client.GetWorkItemAsync(ctx.Id("workitem show <id>"));
         if (ctx.Json)
             return Output.WriteJson(w);
 

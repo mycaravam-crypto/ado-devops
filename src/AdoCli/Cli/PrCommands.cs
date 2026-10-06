@@ -21,7 +21,7 @@ public static class PrCommands
 
     public static async Task<int> ShowAsync(Context ctx)
     {
-        var pr = await ctx.Client.GetPullRequestAsync(Id(ctx, "show"));
+        var pr = await ctx.Client.GetPullRequestAsync(ctx.Id("pr show <id>"));
         if (ctx.Json)
             return Output.WriteJson(pr);
 
@@ -50,7 +50,7 @@ public static class PrCommands
     /// <summary>Everything needed to understand a PR, as one JSON document. Always JSON.</summary>
     public static async Task<int> ContextAsync(Context ctx)
     {
-        var pr = await ctx.Client.GetPullRequestAsync(Id(ctx, "context"));
+        var pr = await ctx.Client.GetPullRequestAsync(ctx.Id("pr context <id>"));
         var commits = ctx.Client.GetPullRequestCommitsAsync(pr);
         var changes = ctx.Client.GetPullRequestChangesAsync(pr);
         var workItems = ctx.Client.GetWorkItemsAsync(await ctx.Client.GetPullRequestWorkItemIdsAsync(pr));
@@ -60,9 +60,9 @@ public static class PrCommands
     public static async Task<int> DiffAsync(Context ctx)
     {
         if (ctx.Json)
-            return Output.WriteJson(await ctx.Client.GetPullRequestChangesAsync(await ctx.Client.GetPullRequestAsync(Id(ctx, "diff"))));
+            return Output.WriteJson(await ctx.Client.GetPullRequestChangesAsync(await ctx.Client.GetPullRequestAsync(ctx.Id("pr diff <id>"))));
 
-        var pr = await GetInCurrentRepoAsync(ctx, "diff");
+        var pr = await GetInCurrentRepoAsync(ctx, "pr diff <id>");
         if (pr.LastMergeSourceCommit is null || pr.LastMergeTargetCommit is null)
             throw new AdoException($"PR #{pr.PullRequestId} has no merge commits to compare yet");
 
@@ -72,7 +72,7 @@ public static class PrCommands
 
     public static async Task<int> CheckoutAsync(Context ctx)
     {
-        var pr = await GetInCurrentRepoAsync(ctx, "checkout");
+        var pr = await GetInCurrentRepoAsync(ctx, "pr checkout <id>");
         if (GitClient.Check("status", "--porcelain", "--untracked-files=no").Length > 0)
             throw new AdoException("you have uncommitted changes; commit or stash them first");
 
@@ -117,7 +117,7 @@ public static class PrCommands
 
     public static async Task<int> ApproveAsync(Context ctx)
     {
-        var pr = await ctx.Client.GetPullRequestAsync(Id(ctx, "approve"));
+        var pr = await ctx.Client.GetPullRequestAsync(ctx.Id("pr approve <id>"));
         var me = (await ctx.Client.GetConnectionDataAsync()).AuthenticatedUser.Id;
         var reviewer = await ctx.Client.VoteAsync(pr, me, 10);
         Console.Error.WriteLine($"Approved PR #{pr.PullRequestId}: {pr.Title}");
@@ -126,7 +126,7 @@ public static class PrCommands
 
     public static async Task<int> MergeAsync(Context ctx)
     {
-        var pr = await ctx.Client.GetPullRequestAsync(Id(ctx, "merge"));
+        var pr = await ctx.Client.GetPullRequestAsync(ctx.Id("pr merge <id>"));
         if (pr.Status != "active")
             throw new AdoException($"PR #{pr.PullRequestId} is {pr.Status}, not active");
 
@@ -164,16 +164,13 @@ public static class PrCommands
         : [["fetch", "--quiet", "origin", sourceRef], ["checkout", "--quiet", "-b", branch, "FETCH_HEAD"]];
 
     /// <summary>Loads a PR and checks that the current directory is a clone of its repository.</summary>
-    static async Task<PullRequest> GetInCurrentRepoAsync(Context ctx, string verb)
+    static async Task<PullRequest> GetInCurrentRepoAsync(Context ctx, string usage)
     {
-        var pr = await ctx.Client.GetPullRequestAsync(Id(ctx, verb));
+        var pr = await ctx.Client.GetPullRequestAsync(ctx.Id(usage));
         if (!string.Equals(ctx.Remote?.Repo, pr.Repository.Name, StringComparison.OrdinalIgnoreCase))
             throw AdoException.Usage($"PR #{pr.PullRequestId} belongs to repository '{pr.Repository.Name}'; run this inside a clone of it");
         return pr;
     }
-
-    static int Id(Context ctx, string verb) =>
-        int.TryParse(ctx.Args.At(2), out var id) ? id : throw AdoException.Usage($"usage: ado pr {verb} <id>");
 
     static string Vote(int vote) => vote switch
     {

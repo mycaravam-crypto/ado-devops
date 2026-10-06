@@ -19,7 +19,7 @@ public static class BuildCommands
 
     public static async Task<int> ShowAsync(Context ctx)
     {
-        var b = await ctx.Client.GetBuildAsync(ctx.RequireProject(), Id(ctx, "show <id>"));
+        var b = await ctx.Client.GetBuildAsync(ctx.RequireProject(), ctx.Id("build show <id>"));
         if (ctx.Json)
             return Output.WriteJson(b);
 
@@ -38,7 +38,7 @@ public static class BuildCommands
     public static async Task<int> RunAsync(Context ctx)
     {
         var branch = ctx.Args.Get("--branch") is { } name ? Output.Ref(name) : null;
-        var b = await ctx.Client.QueueBuildAsync(ctx.RequireProject(), Id(ctx, "run <definition-id>"), branch);
+        var b = await ctx.Client.QueueBuildAsync(ctx.RequireProject(), ctx.Id("build run <definition-id>"), branch);
         if (ctx.Json)
             return Output.WriteJson(b);
 
@@ -47,7 +47,4 @@ public static class BuildCommands
             Console.WriteLine(url);
         return 0;
     }
-
-    static int Id(Context ctx, string usage) =>
-        int.TryParse(ctx.Args.At(2), out var id) ? id : throw AdoException.Usage($"usage: ado build {usage}");
 }

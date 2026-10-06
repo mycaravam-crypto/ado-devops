@@ -37,6 +37,10 @@ public sealed class AdoClient
         return $"{_server}{scope}/_apis/{path}?{q}api-version={ApiVersion}";
     }
 
+    // connectionData only exists as a preview API, so it is called without api-version.
+    public Task<ConnectionData> GetConnectionDataAsync() =>
+        SendAsync<ConnectionData>(HttpMethod.Get, $"{_server}/_apis/connectionData");
+
     public async Task<T> SendAsync<T>(HttpMethod method, string url, object? body = null)
     {
         using var request = new HttpRequestMessage(method, url);

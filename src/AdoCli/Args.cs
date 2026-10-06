@@ -5,7 +5,7 @@ using AdoCli.Api;
 /// <summary>Positional arguments plus --options. Options not listed in <see cref="Flags"/> take a value.</summary>
 public sealed class Args
 {
-    static readonly HashSet<string> Flags = ["--debug", "--help", "-h", "--version"];
+    static readonly HashSet<string> Flags = ["--debug", "--help", "-h", "--version", "--json"];
 
     readonly Dictionary<string, string?> _options = [];
 

@@ -28,3 +28,23 @@ public static class Term
         return secret.ToString().Trim();
     }
 }
+
+public static class Output
+{
+    public static int WriteJson(object value)
+    {
+        Console.WriteLine(JsonSerializer.Serialize(value, Json.Options));
+        return 0;
+    }
+
+    /// <summary>Left-aligned columns separated by two spaces; the last column is not padded.</summary>
+    public static void Table(string[] headers, IEnumerable<string[]> rows)
+    {
+        var all = rows.Prepend(headers).ToList();
+        var widths = headers.Select((_, i) => all.Max(r => r[i].Length)).ToArray();
+        foreach (var row in all)
+            Console.WriteLine(string.Concat(row.Select((cell, i) => i == row.Length - 1 ? cell : cell.PadRight(widths[i] + 2))));
+    }
+
+    public static string Branch(string? refName) => refName?.Replace("refs/heads/", "") ?? "";
+}

@@ -31,6 +31,10 @@ public sealed class Context(Args args)
     public string RequireRepo() => Repo ??
         throw AdoException.Usage("could not determine the repository; run inside a cloned repository or pass --repo <name>");
 
+    /// <summary>The numeric argument after the subcommand, e.g. 142 in "ado pr show 142".</summary>
+    public int Id(string usage) =>
+        int.TryParse(args.At(2), out var id) ? id : throw AdoException.Usage($"usage: ado {usage}");
+
     public AdoClient Client => _client ??= Server is { } server && Config.Pat is { } pat
         ? new AdoClient(server, pat, args.Has("--debug"))
         : throw new AdoException("not logged in.\n\nRun:\n  ado auth login <server-url>", AdoException.Auth);

@@ -58,7 +58,7 @@ public static class Program
         {
             return await RunAsync(Args.Parse(argv));
         }
-        catch (HttpRequestException e) when (e.StatusCode is null && !debug)
+        catch (HttpRequestException e) when (!debug)
         {
             Console.Error.WriteLine($"Error: could not reach Azure DevOps Server: {e.Message}");
             return AdoException.General;

@@ -8,9 +8,7 @@ public static class PrCommands
     public static async Task<int> ListAsync(Context ctx)
     {
         Guid? creator = ctx.Args.Has("--mine") ? (await ctx.Client.GetConnectionDataAsync()).AuthenticatedUser.Id : null;
-        var repo = ctx.Repo;
-        var project = repo is null ? ctx.Project : ctx.RequireProject();
-        var prs = await ctx.Client.GetPullRequestsAsync(project, repo, ctx.Args.Get("--status") ?? "active", creator);
+        var prs = await ctx.Client.GetPullRequestsAsync(ctx.RequireProject(), ctx.Repo, ctx.Args.Get("--status") ?? "active", creator);
         if (ctx.Json)
             return Output.WriteJson(prs);
 

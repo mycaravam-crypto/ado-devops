@@ -21,7 +21,7 @@ public static class Program
           repo show [<repo>]        show repository details
           repo clone <repo> [dir]   clone a repository with git
 
-          pr list                   list pull requests [--mine] [--status active|completed|abandoned|all]
+          pr list                   list pull requests of the project/repository [--mine] [--status active|completed|abandoned|all]
           pr show <id>              show a pull request
           pr diff <id>              show the changes of a pull request (uses git)
           pr checkout <id>          check out a pull request as local branch pr/<id>
@@ -56,11 +56,6 @@ public static class Program
         {
             return await RunAsync(Args.Parse(argv));
         }
-        catch (AdoException e)
-        {
-            Console.Error.WriteLine(debug ? e.ToString() : $"Error: {e.Message}");
-            return e.ExitCode;
-        }
         catch (HttpRequestException e) when (e.StatusCode is null && !debug)
         {
             Console.Error.WriteLine($"Error: could not reach Azure DevOps Server: {e.Message}");
@@ -74,7 +69,7 @@ public static class Program
         catch (Exception e)
         {
             Console.Error.WriteLine(debug ? e.ToString() : $"Error: {e.Message}");
-            return AdoException.General;
+            return e is AdoException ado ? ado.ExitCode : AdoException.General;
         }
     }
 

@@ -5,13 +5,102 @@ It covers the everyday workflow — repositories, pull requests, work items, bui
 
 ## Installation
 
-Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) to build and `git` on your `PATH`.
+Building needs the [.NET 10 SDK](https://dotnet.microsoft.com/download). Running needs `git` on your `PATH`.
+
+### 1. Compile
+
+`dotnet publish` creates a single `ado` executable (`ado.exe` on Windows). Choose the runtime identifier for your platform:
+
+| Platform | `-r` |
+|---|---|
+| Linux x64 | `linux-x64` |
+| Linux ARM64 | `linux-arm64` |
+| macOS Apple Silicon | `osx-arm64` |
+| macOS Intel | `osx-x64` |
+| Windows x64 | `win-x64` |
+
+```bash
+# Needs the .NET 10 runtime on the machine (small binary)
+dotnet publish src/AdoCli -c Release -r linux-x64 --self-contained false -p:PublishSingleFile=true -o out
+
+# Runs without .NET installed (larger binary, can be copied to other machines with the same platform)
+dotnet publish src/AdoCli -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true -o out
+```
+
+The executable ends up in `out/`. To update later, pull and run the same command again.
+
+### 2. Use it from bash (Linux, macOS, WSL, Git Bash)
+
+Publish straight into a directory on your `PATH`, for example `~/.local/bin`:
 
 ```bash
 dotnet publish src/AdoCli -c Release -r linux-x64 --self-contained false -p:PublishSingleFile=true -o ~/.local/bin
 ```
 
-Use `-r win-x64` or `-r osx-arm64` on other platforms. This puts a single `ado` executable in `~/.local/bin`.
+If `~/.local/bin` is not on your `PATH` yet, add it to `~/.bashrc` (on macOS with zsh: `~/.zshrc`) and reload:
+
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+ado --version
+```
+
+Optionally set defaults in `~/.bashrc` so you don't need to pass them:
+
+```bash
+export ADO_SERVER="https://tfs.company.local/tfs/DefaultCollection"
+export ADO_PROJECT="Platform"
+```
+
+In scripts, use the exit code and the JSON output:
+
+```bash
+if ado pr show 142 --json > pr.json; then
+  jq -r '.title' pr.json
+else
+  echo "ado failed with exit code $?" >&2
+fi
+```
+
+### 3. Use it from PowerShell (Windows)
+
+Publish into a folder of your own and add that folder to your user `PATH` once:
+
+```powershell
+$bin = "$env:LOCALAPPDATA\Programs\ado"
+dotnet publish src/AdoCli -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o $bin
+
+# Add the folder to the user PATH permanently (only needed once)
+$userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+if (($userPath -split ';') -notcontains $bin) {
+    [Environment]::SetEnvironmentVariable('Path', "$userPath;$bin", 'User')
+}
+$env:Path += ";$bin"   # current session; new terminals pick it up automatically
+
+ado --version
+```
+
+Optionally set defaults in your PowerShell profile (`notepad $PROFILE`; create it first with
+`New-Item -Force $PROFILE` if it doesn't exist):
+
+```powershell
+$env:ADO_SERVER  = 'https://tfs.company.local/tfs/DefaultCollection'
+$env:ADO_PROJECT = 'Platform'
+```
+
+In scripts, check `$LASTEXITCODE` and parse the JSON with `ConvertFrom-Json`:
+
+```powershell
+$pr = ado pr show 142 --json | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0) { throw "ado failed with exit code $LASTEXITCODE" }
+$pr.title
+```
+
+**PowerShell 7 on Linux or macOS:** install the binary as in the bash section. Then add the folder to `$env:PATH`
+in `$PROFILE`: `$env:PATH = "$HOME/.local/bin:$env:PATH"`.
+
+Don't put `ADO_PAT` in `~/.bashrc` or `$PROFILE`. Run `ado auth login` once instead (see below). It stores the token in
+`~/.ado/config.json`. On Linux and macOS only you can read that file. On Windows it is `%USERPROFILE%\.ado\config.json`, protected by your user profile's permissions.
 
 ## Authentication
 

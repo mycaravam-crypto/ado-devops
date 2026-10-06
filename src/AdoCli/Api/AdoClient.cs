@@ -18,8 +18,13 @@ public sealed class AdoClient
     readonly string _server;
     readonly bool _debug;
 
+    public const string CredentialsInUrl = "the server URL must not contain credentials; log in with a personal access token instead";
+
     public AdoClient(string server, string pat, bool debug = false, HttpMessageHandler? handler = null)
     {
+        // Every URL is built from the server and printed by --debug, so it must not carry a secret.
+        if (Uri.TryCreate(server, UriKind.Absolute, out var uri) && uri.UserInfo.Length > 0)
+            throw AdoException.Usage(CredentialsInUrl);
         _server = server.TrimEnd('/');
         _debug = debug;
         _http = new HttpClient(handler ?? new HttpClientHandler()) { Timeout = TimeSpan.FromSeconds(60) };

@@ -7,7 +7,9 @@ public static class AuthCommands
     public static async Task<int> LoginAsync(Context ctx)
     {
         var server = ctx.Args.At(2) ?? throw AdoException.Usage("usage: ado auth login <server-url>");
-        if (!Uri.TryCreate(server, UriKind.Absolute, out var uri) || uri.Scheme is not ("https" or "http"))
+        if (Uri.TryCreate(server, UriKind.Absolute, out var uri) && uri.UserInfo.Length > 0)
+            throw AdoException.Usage(AdoClient.CredentialsInUrl);
+        if (uri is null || uri.Scheme is not ("https" or "http"))
             throw AdoException.Usage($"invalid server URL '{server}'; expected e.g. https://tfs.company.local/tfs/DefaultCollection");
         if (uri.Scheme == "http")
             Console.Error.WriteLine("Warning: using unencrypted HTTP; your token will be sent in clear text.");

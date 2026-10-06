@@ -39,6 +39,15 @@ public class AdoClientTests
     }
 
     [Fact]
+    public void RejectsCredentialsInServerUrl()
+    {
+        var e = Assert.Throws<AdoException>(() => new AdoClient("https://me:secret-pat@tfs/DefaultCollection", "pat"));
+
+        Assert.Equal(AdoException.InvalidUsage, e.ExitCode);
+        Assert.DoesNotContain("secret-pat", e.Message);
+    }
+
+    [Fact]
     public async Task SendsPatAsBasicAuth()
     {
         var stub = new StubHandler(HttpStatusCode.OK);

@@ -8,4 +8,24 @@ public sealed record ListResponse<T>(List<T> Value);
 
 public sealed record ProjectRef(string Name);
 
-public sealed record Repository(Guid Id, string Name, string? DefaultBranch, string RemoteUrl, string WebUrl, ProjectRef Project);
+public sealed record Repository(Guid Id, string Name, string? DefaultBranch, string? RemoteUrl, string? WebUrl, ProjectRef Project);
+
+public sealed record IdentityRef(string DisplayName);
+
+/// <summary>Vote: 10 approved, 5 approved with suggestions, 0 none, -5 waiting for author, -10 rejected.</summary>
+public sealed record Reviewer(string DisplayName, int Vote);
+
+public sealed record CommitRef(string CommitId);
+
+public sealed record PullRequest(
+    int PullRequestId,
+    string Title,
+    string? Description,
+    string Status,
+    IdentityRef CreatedBy,
+    Repository Repository,
+    string SourceRefName,
+    string TargetRefName,
+    CommitRef? LastMergeSourceCommit,
+    CommitRef? LastMergeTargetCommit,
+    List<Reviewer>? Reviewers);

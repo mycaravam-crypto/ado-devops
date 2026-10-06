@@ -21,6 +21,10 @@ public static class Program
           repo show [<repo>]        show repository details
           repo clone <repo> [dir]   clone a repository with git
 
+          pr list                   list pull requests [--mine] [--status active|completed|abandoned|all]
+          pr show <id>              show a pull request
+          pr diff <id>              show the changes of a pull request (uses git)
+
         Inside a cloned Azure DevOps repository, project and repository are detected
         from the origin remote. Otherwise pass --project <name> and --repo <name>,
         or set a default project with ADO_PROJECT.
@@ -79,6 +83,9 @@ public static class Program
             ("repo", "list") => RepoCommands.ListAsync(ctx),
             ("repo", "show") => RepoCommands.ShowAsync(ctx),
             ("repo", "clone") => RepoCommands.CloneAsync(ctx),
+            ("pr", "list") => PrCommands.ListAsync(ctx),
+            ("pr", "show") => PrCommands.ShowAsync(ctx),
+            ("pr", "diff") => PrCommands.DiffAsync(ctx),
             _ => throw AdoException.Usage($"unknown command '{string.Join(' ', a.Positional.Take(2))}'. Run 'ado --help'."),
         };
     }

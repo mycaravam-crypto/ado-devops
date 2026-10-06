@@ -36,7 +36,7 @@ public static class RepoCommands
     public static async Task<int> CloneAsync(Context ctx)
     {
         var repo = await GetAsync(ctx);
-        string[] args = ctx.Args.At(3) is { } dir ? ["clone", repo.RemoteUrl, dir] : ["clone", repo.RemoteUrl];
+        string[] args = ctx.Args.At(3) is { } dir ? ["clone", repo.RemoteUrl!, dir] : ["clone", repo.RemoteUrl!];
         return GitClient.Run(args, capture: false).ExitCode;
     }
 

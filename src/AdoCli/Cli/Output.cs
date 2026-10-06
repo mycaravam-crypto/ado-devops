@@ -46,5 +46,23 @@ public static class Output
             Console.WriteLine(string.Concat(row.Select((cell, i) => i == row.Length - 1 ? cell : cell.PadRight(widths[i] + 2))));
     }
 
+    /// <summary>"active" → "Active", colored only when writing to a terminal.</summary>
+    public static string Status(string status)
+    {
+        var text = status.Length == 0 ? status : char.ToUpperInvariant(status[0]) + status[1..];
+        var color = status switch
+        {
+            "active" or "succeeded" => "32",
+            "completed" => "35",
+            "abandoned" or "failed" => "31",
+            _ => null,
+        };
+        return color is null || !UseColor ? text : $"\e[{color}m{text}\e[0m";
+    }
+
+    static bool UseColor => !Console.IsOutputRedirected && Environment.GetEnvironmentVariable("NO_COLOR") is null;
+
+    public static string Truncate(string s, int max) => s.Length <= max ? s : s[..(max - 1)] + "…";
+
     public static string Branch(string? refName) => refName?.Replace("refs/heads/", "") ?? "";
 }

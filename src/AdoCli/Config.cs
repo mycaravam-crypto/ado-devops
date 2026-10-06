@@ -15,6 +15,7 @@ public sealed class Config
     public static string DefaultPath { get; } =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".ado", "config.json");
 
+    /// <summary>The config file merged with the environment; each set environment variable wins over its file value.</summary>
     public static Config Load(string? path = null)
     {
         var file = ReadFile(path ?? DefaultPath);

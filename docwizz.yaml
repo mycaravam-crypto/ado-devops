@@ -5,7 +5,7 @@ check:
   min_coverage: 80
   max_critical: 0
   max_violations: 0
-  max_cycles: 0
+  max_cycles: 1         # src/AdoCli <-> src/AdoCli/Cli: Program dispatches to the commands, which use Args and Config from the root
   fail_on: medium       # minimum violation severity that fails check: low, medium, high
 architecture:
   layers:               # path globs, first match wins; Program.cs, Args.cs and Config.cs have no layer

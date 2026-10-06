@@ -25,6 +25,9 @@ public static class Program
           pr show <id>              show a pull request
           pr diff <id>              show the changes of a pull request (uses git)
           pr checkout <id>          check out a pull request as local branch pr/<id>
+          pr create                 create a pull request (prompts, or --title --description --source --target)
+          pr approve <id>           approve a pull request
+          pr merge <id>             complete a pull request [--squash] [--yes]
 
         Inside a cloned Azure DevOps repository, project and repository are detected
         from the origin remote. Otherwise pass --project <name> and --repo <name>,
@@ -88,6 +91,9 @@ public static class Program
             ("pr", "show") => PrCommands.ShowAsync(ctx),
             ("pr", "diff") => PrCommands.DiffAsync(ctx),
             ("pr", "checkout") => PrCommands.CheckoutAsync(ctx),
+            ("pr", "create") => PrCommands.CreateAsync(ctx),
+            ("pr", "approve") => PrCommands.ApproveAsync(ctx),
+            ("pr", "merge") => PrCommands.MergeAsync(ctx),
             _ => throw AdoException.Usage($"unknown command '{string.Join(' ', a.Positional.Take(2))}'. Run 'ado --help'."),
         };
     }

@@ -9,6 +9,20 @@ public static class Json
 
 public static class Term
 {
+    /// <summary>Asks for a line on stderr; an empty answer takes <paramref name="defaultValue"/>.</summary>
+    public static string Prompt(string label, string? defaultValue = null)
+    {
+        Console.Error.Write(defaultValue is { Length: > 0 } ? $"{label} [{defaultValue}]: " : $"{label}: ");
+        var answer = Console.In.ReadLine()?.Trim();
+        return string.IsNullOrEmpty(answer) ? defaultValue ?? "" : answer;
+    }
+
+    public static bool Confirm(string question)
+    {
+        Console.Error.Write(question);
+        return Console.In.ReadLine()?.Trim().ToLowerInvariant() is "y" or "yes";
+    }
+
     /// <summary>Reads a secret without echo; reads a plain line when stdin is piped (e.g. in CI).</summary>
     public static string ReadSecret(string prompt)
     {

@@ -1,6 +1,7 @@
 namespace AdoCli.Tests;
 
 using System.Net;
+using System.Text.Json.Nodes;
 using AdoCli.Api;
 
 public class PullRequestTests
@@ -39,4 +40,47 @@ public class PullRequestTests
         Assert.Equal("Platform", pr.Repository.Project.Name);
         Assert.Equal(10, pr.Reviewers!.Single().Vote);
     }
+
+    [Fact]
+    public async Task CreatesPullRequest()
+    {
+        var stub = new StubHandler(HttpStatusCode.Created, Pr);
+
+        await new AdoClient("https://tfs", "pat", handler: stub)
+            .CreatePullRequestAsync("Platform", "connector", "refs/heads/feature/x", "refs/heads/main", "Fix", "");
+
+        Assert.Equal(HttpMethod.Post, stub.Requests[0].Method);
+        Assert.Equal("https://tfs/Platform/_apis/git/repositories/connector/pullrequests?api-version=5.0", stub.Requests[0].Url);
+        AssertJson("""{"sourceRefName":"refs/heads/feature/x","targetRefName":"refs/heads/main","title":"Fix","description":""}""", stub.Requests[0].Body);
+    }
+
+    [Fact]
+    public async Task ApprovesAsReviewer()
+    {
+        var stub = new StubHandler(HttpStatusCode.OK, Pr);
+        var client = new AdoClient("https://tfs", "pat", handler: stub);
+        var me = Guid.NewGuid();
+
+        await client.VoteAsync(await client.GetPullRequestAsync(142), me, 10);
+
+        Assert.Equal(HttpMethod.Put, stub.Requests[1].Method);
+        Assert.Equal($"https://tfs/Platform/_apis/git/repositories/22222222-2222-2222-2222-222222222222/pullrequests/142/reviewers/{me}?api-version=5.0",
+            stub.Requests[1].Url);
+        AssertJson("""{"vote":10}""", stub.Requests[1].Body);
+    }
+
+    [Fact]
+    public async Task CompletesAtLastSeenSourceCommit()
+    {
+        var stub = new StubHandler(HttpStatusCode.OK, Pr);
+        var client = new AdoClient("https://tfs", "pat", handler: stub);
+
+        await client.CompletePullRequestAsync(await client.GetPullRequestAsync(142), squash: true);
+
+        Assert.Equal(HttpMethod.Patch, stub.Requests[1].Method);
+        AssertJson("""{"status":"completed","lastMergeSourceCommit":{"commitId":"abc"},"completionOptions":{"squashMerge":true}}""", stub.Requests[1].Body);
+    }
+
+    static void AssertJson(string expected, string? actual) =>
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse(expected), JsonNode.Parse(actual!)), actual);
 }

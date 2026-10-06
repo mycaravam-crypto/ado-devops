@@ -47,8 +47,8 @@ public sealed class AdoClient
     public Task<Repository> GetRepositoryAsync(string project, string repo) =>
         SendAsync<Repository>(HttpMethod.Get, Url(project, $"git/repositories/{Uri.EscapeDataString(repo)}"));
 
-    /// <summary>Pull requests of a repository, or of a project/collection when <paramref name="repo"/> is null.</summary>
-    public async Task<List<PullRequest>> GetPullRequestsAsync(string? project, string? repo, string status, Guid? creatorId)
+    /// <summary>Pull requests of a repository, or of the whole project when <paramref name="repo"/> is null.</summary>
+    public async Task<List<PullRequest>> GetPullRequestsAsync(string project, string? repo, string status, Guid? creatorId)
     {
         var path = repo is null ? "git/pullrequests" : $"git/repositories/{Uri.EscapeDataString(repo)}/pullrequests";
         var query = $"searchCriteria.status={Uri.EscapeDataString(status)}&$top=50";

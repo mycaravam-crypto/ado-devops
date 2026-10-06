@@ -80,6 +80,24 @@ public sealed class AdoClient
     string PullRequestUrl(PullRequest pr, string suffix = "") =>
         Url(pr.Repository.Project.Name, $"git/repositories/{pr.Repository.Id}/pullrequests/{pr.PullRequestId}{suffix}");
 
+    public Task<WorkItem> GetWorkItemAsync(int id) =>
+        SendAsync<WorkItem>(HttpMethod.Get, Url(null, $"wit/workitems/{id}"));
+
+    /// <summary>Open work items assigned to the current user, most recently changed first.</summary>
+    public async Task<List<WorkItem>> GetMyWorkItemsAsync(string? project)
+    {
+        var inProject = project is null ? "" : " AND [System.TeamProject] = @project";
+        var wiql = "SELECT [System.Id] FROM WorkItems WHERE [System.AssignedTo] = @Me AND [System.State] NOT IN ('Closed', 'Done', 'Removed')"
+            + inProject + " ORDER BY [System.ChangedDate] DESC";
+        var result = await SendAsync<WiqlResult>(HttpMethod.Post, Url(project, "wit/wiql", "$top=50"), new { query = wiql });
+        if (result.WorkItems.Count == 0)
+            return [];
+
+        var ids = string.Join(',', result.WorkItems.Select(w => w.Id));
+        var query = $"ids={ids}&fields=System.Title,System.WorkItemType,System.State";
+        return (await SendAsync<ListResponse<WorkItem>>(HttpMethod.Get, Url(null, "wit/workitems", query))).Value;
+    }
+
     public async Task<T> SendAsync<T>(HttpMethod method, string url, object? body = null)
     {
         using var request = new HttpRequestMessage(method, url);

@@ -29,6 +29,9 @@ public static class Program
           pr approve <id>           approve a pull request
           pr merge <id>             complete a pull request [--squash] [--yes]
 
+          workitem list             list open work items assigned to you
+          workitem show <id>        show a work item
+
         Inside a cloned Azure DevOps repository, project and repository are detected
         from the origin remote. Otherwise pass --project <name> and --repo <name>,
         or set a default project with ADO_PROJECT.
@@ -94,6 +97,8 @@ public static class Program
             ("pr", "create") => PrCommands.CreateAsync(ctx),
             ("pr", "approve") => PrCommands.ApproveAsync(ctx),
             ("pr", "merge") => PrCommands.MergeAsync(ctx),
+            ("workitem", "list") => WorkItemCommands.ListAsync(ctx),
+            ("workitem", "show") => WorkItemCommands.ShowAsync(ctx),
             _ => throw AdoException.Usage($"unknown command '{string.Join(' ', a.Positional.Take(2))}'. Run 'ado --help'."),
         };
     }

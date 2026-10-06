@@ -37,6 +37,9 @@ public static class GitClient
         return r.ExitCode == 0 ? r.Stdout.Trim() : throw new AdoException(r.Stderr.Trim() is { Length: > 0 } e ? e : $"git {args[0]} failed");
     }
 
+    /// <summary>Runs git attached to the terminal; any git failure becomes exit code 1, keeping ado's exit codes stable.</summary>
+    public static int Passthrough(params string[] args) => Run(args, capture: false).ExitCode == 0 ? 0 : AdoException.General;
+
     /// <summary>The origin remote of the current directory's repository, if it is an Azure DevOps repo.</summary>
     public static Remote? DetectRemote(string? configuredServer)
     {

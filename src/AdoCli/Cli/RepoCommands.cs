@@ -37,7 +37,7 @@ public static class RepoCommands
     {
         var repo = await GetAsync(ctx);
         string[] args = ctx.Args.At(3) is { } dir ? ["clone", repo.RemoteUrl!, dir] : ["clone", repo.RemoteUrl!];
-        return GitClient.Run(args, capture: false).ExitCode;
+        return GitClient.Passthrough(args);
     }
 
     /// <summary>What the origin remote says, without calling the server. SSH remotes carry no server URL and are assumed to be the configured one.</summary>

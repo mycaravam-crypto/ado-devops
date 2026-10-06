@@ -39,6 +39,26 @@ public class AdoClientTests
     }
 
     [Fact]
+    public void UsesConfiguredApiVersion()
+    {
+        Assert.Equal("https://tfs/_apis/x?api-version=6.0", new AdoClient("https://tfs", "pat", apiVersion: "6.0").Url(null, "x"));
+    }
+
+    [Fact]
+    public async Task ExplainsUnsupportedApiVersion()
+    {
+        var stub = new StubHandler(HttpStatusCode.BadRequest,
+            """{"message":"The requested REST API version of 7.0 is out of range for this server.","typeKey":"VssVersionOutOfRangeException"}""");
+        var client = new AdoClient("https://tfs", "pat", handler: stub, apiVersion: "7.0");
+
+        var e = await Assert.ThrowsAsync<AdoException>(() => client.SendAsync<object>(HttpMethod.Get, client.Url(null, "x")));
+
+        Assert.Equal(AdoException.General, e.ExitCode);
+        Assert.Contains("REST API version 7.0", e.Message);
+        Assert.Contains("ADO_API_VERSION", e.Message);
+    }
+
+    [Fact]
     public void RejectsCredentialsInServerUrl()
     {
         var e = Assert.Throws<AdoException>(() => new AdoClient("https://me:secret-pat@tfs/DefaultCollection", "pat"));

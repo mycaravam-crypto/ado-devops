@@ -111,8 +111,20 @@ Commands that change state (`pr create`, `pr approve`, `pr merge`, `build run`) 
 { "server": "https://tfs.company.local/tfs/DefaultCollection", "pat": "...", "project": "Platform" }
 ```
 
-`project` is optional and set by hand. Environment variables override the file:
-`ADO_SERVER`, `ADO_PAT`, `ADO_PROJECT`.
+`project` and `apiVersion` are optional and set by hand. Environment variables override the file:
+`ADO_SERVER`, `ADO_PAT`, `ADO_PROJECT`, `ADO_API_VERSION`.
+
+### Supported servers
+
+| Server | Highest REST API version |
+|---|---|
+| Azure DevOps Server 2019 | 5.0 (5.1 on Update 1) |
+| Azure DevOps Server 2020 | 6.0 |
+| Azure DevOps Server 2022 | 7.0 |
+
+`ado` sends `api-version=5.0` by default, which all of them accept and every command works with.
+To use a newer one, set `ADO_API_VERSION=6.0` (or `"apiVersion": "6.0"` in the config file). If the server does not
+support the version, `ado` says so and exits with 1. TFS 2018 and older are not supported.
 
 Inside a clone of an Azure DevOps repository, project and repository are taken from the `origin` remote,
 so most commands need no arguments. Elsewhere, pass `--project <name>` and `--repo <name>`.
@@ -126,5 +138,5 @@ dotnet run --project src/AdoCli -- --help
 ```
 
 The code is deliberately flat: commands in `src/AdoCli/Cli` call `Api/AdoClient` (one `HttpClient`) and `Git/GitClient`
-(runs `git`) directly. REST API version `5.0` (Azure DevOps Server 2019+) is set in one place in `AdoClient`.
+(runs `git`) directly. The REST API version (default `5.0`) is added to every URL in one place, `AdoClient.Url`.
 Tests use a stub HTTP handler; no real server is needed. See [PLAN.md](PLAN.md) for scope and non-goals.

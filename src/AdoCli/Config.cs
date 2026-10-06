@@ -4,12 +4,13 @@ using System.Text.Json;
 using AdoCli.Api;
 using AdoCli.Cli;
 
-/// <summary>~/.ado/config.json, overridden by ADO_SERVER / ADO_PAT / ADO_PROJECT.</summary>
+/// <summary>~/.ado/config.json, overridden by ADO_SERVER / ADO_PAT / ADO_PROJECT / ADO_API_VERSION.</summary>
 public sealed class Config
 {
     public string? Server { get; init; }
     public string? Pat { get; init; }
     public string? Project { get; init; }
+    public string? ApiVersion { get; init; }
 
     public static string DefaultPath { get; } =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".ado", "config.json");
@@ -22,6 +23,7 @@ public sealed class Config
             Server = Env("ADO_SERVER") ?? file?.Server,
             Pat = Env("ADO_PAT") ?? file?.Pat,
             Project = Env("ADO_PROJECT") ?? file?.Project,
+            ApiVersion = Env("ADO_API_VERSION") ?? file?.ApiVersion,
         };
     }
 

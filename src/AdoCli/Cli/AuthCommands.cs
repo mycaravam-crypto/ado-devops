@@ -20,7 +20,8 @@ public static class AuthCommands
 
         server = server.TrimEnd('/');
         var user = await new AdoClient(server, pat, ctx.Args.Has("--debug")).GetConnectionDataAsync();
-        new Config { Server = server, Pat = pat, Project = Config.ReadFile(Config.DefaultPath)?.Project }.Save();
+        var old = Config.ReadFile(Config.DefaultPath);
+        new Config { Server = server, Pat = pat, Project = old?.Project, ApiVersion = old?.ApiVersion }.Save();
         Console.WriteLine($"Logged in to {server} as {user.AuthenticatedUser.ProviderDisplayName}");
         return 0;
     }

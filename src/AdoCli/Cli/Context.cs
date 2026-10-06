@@ -36,6 +36,6 @@ public sealed class Context(Args args)
         int.TryParse(args.At(2), out var id) ? id : throw AdoException.Usage($"usage: ado {usage}");
 
     public AdoClient Client => _client ??= Server is { } server && Config.Pat is { } pat
-        ? new AdoClient(server, pat, args.Has("--debug"))
+        ? new AdoClient(server, pat, args.Has("--debug"), apiVersion: Config.ApiVersion ?? AdoClient.DefaultApiVersion)
         : throw new AdoException("not logged in.\n\nRun:\n  ado auth login <server-url>", AdoException.Auth);
 }

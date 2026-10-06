@@ -39,5 +39,18 @@ public sealed class Config
         }
     }
 
+    /// <summary>Writes the file readable by the current user only, since it holds the PAT.</summary>
+    public void Save(string? path = null)
+    {
+        path ??= DefaultPath;
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.Delete(path); // UnixCreateMode only applies to new files
+        var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write };
+        if (!OperatingSystem.IsWindows())
+            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        using var file = new FileStream(path, options);
+        JsonSerializer.Serialize(file, this, Json.Options);
+    }
+
     static string? Env(string name) => Environment.GetEnvironmentVariable(name) is { Length: > 0 } v ? v : null;
 }

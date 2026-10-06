@@ -1,0 +1,52 @@
+namespace AdoCli.Cli;
+
+using AdoCli.Api;
+
+public static class AuthCommands
+{
+    public static async Task<int> LoginAsync(Context ctx)
+    {
+        var server = ctx.Args.At(2) ?? throw AdoException.Usage("usage: ado auth login <server-url>");
+        if (!Uri.TryCreate(server, UriKind.Absolute, out var uri) || uri.Scheme is not ("https" or "http"))
+            throw AdoException.Usage($"invalid server URL '{server}'; expected e.g. https://tfs.company.local/tfs/DefaultCollection");
+        if (uri.Scheme == "http")
+            Console.Error.WriteLine("Warning: using unencrypted HTTP; your token will be sent in clear text.");
+
+        var pat = Term.ReadSecret("Personal access token: ");
+        if (pat.Length == 0)
+            throw AdoException.Usage("no token given");
+
+        server = server.TrimEnd('/');
+        var user = await new AdoClient(server, pat, ctx.Args.Has("--debug")).GetConnectionDataAsync();
+        new Config { Server = server, Pat = pat, Project = Config.ReadFile(Config.DefaultPath)?.Project }.Save();
+        Console.WriteLine($"Logged in to {server} as {user.AuthenticatedUser.ProviderDisplayName}");
+        return 0;
+    }
+
+    public static async Task<int> StatusAsync(Context ctx)
+    {
+        if (ctx.Config.Server is null || ctx.Config.Pat is null)
+        {
+            Console.Error.WriteLine("Not logged in.\n\nRun:\n  ado auth login <server-url>");
+            return AdoException.Auth;
+        }
+
+        var user = await ctx.Client.GetConnectionDataAsync();
+        var source = Environment.GetEnvironmentVariable("ADO_PAT") is { Length: > 0 } ? " (token from ADO_PAT)" : "";
+        Console.WriteLine($"Logged in to {ctx.Config.Server} as {user.AuthenticatedUser.ProviderDisplayName}{source}");
+        return 0;
+    }
+
+    public static Task<int> LogoutAsync(Context ctx)
+    {
+        if (!File.Exists(Config.DefaultPath))
+        {
+            Console.WriteLine("Not logged in.");
+            return Task.FromResult(0);
+        }
+
+        File.Delete(Config.DefaultPath);
+        Console.WriteLine("Logged out.");
+        return Task.FromResult(0);
+    }
+}

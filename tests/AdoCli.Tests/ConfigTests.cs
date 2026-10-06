@@ -41,4 +41,22 @@ public class ConfigTests
             File.Delete(path);
         }
     }
+
+    [Fact]
+    public void SaveRoundTripsWithOwnerOnlyPermissions()
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString(), "config.json");
+        try
+        {
+            new Config { Server = "https://tfs", Pat = "secret" }.Save(path);
+
+            Assert.Equal("secret", Config.ReadFile(path)!.Pat);
+            if (!OperatingSystem.IsWindows())
+                Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(path));
+        }
+        finally
+        {
+            Directory.Delete(Path.GetDirectoryName(path)!, true);
+        }
+    }
 }

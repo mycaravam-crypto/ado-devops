@@ -2,6 +2,7 @@ namespace AdoCli;
 
 using System.Reflection;
 using AdoCli.Api;
+using AdoCli.Cli;
 
 public static class Program
 {
@@ -10,6 +11,11 @@ public static class Program
 
         Usage:
           ado <command> <subcommand> [arguments] [flags]
+
+        Commands:
+          auth login <server-url>   log in with a personal access token
+          auth status               show login state
+          auth logout               remove stored credentials
 
         Global flags:
           --debug     log HTTP requests and show stack traces
@@ -31,6 +37,16 @@ public static class Program
             Console.Error.WriteLine(debug ? e.ToString() : $"Error: {e.Message}");
             return e.ExitCode;
         }
+        catch (HttpRequestException e) when (e.StatusCode is null && !debug)
+        {
+            Console.Error.WriteLine($"Error: could not reach Azure DevOps Server: {e.Message}");
+            return AdoException.General;
+        }
+        catch (TaskCanceledException) when (!debug)
+        {
+            Console.Error.WriteLine("Error: request to Azure DevOps Server timed out");
+            return AdoException.General;
+        }
         catch (Exception e)
         {
             Console.Error.WriteLine(debug ? e.ToString() : $"Error: {e.Message}");
@@ -45,7 +61,14 @@ public static class Program
         if (a.Has("--help") || a.Has("-h") || a.Positional.Count == 0 || a.At(0) == "help")
             return Print(Help);
 
-        throw AdoException.Usage($"unknown command '{string.Join(' ', a.Positional.Take(2))}'. Run 'ado --help'.");
+        var ctx = new Context(a);
+        return (a.At(0), a.At(1)) switch
+        {
+            ("auth", "login") => AuthCommands.LoginAsync(ctx),
+            ("auth", "status") => AuthCommands.StatusAsync(ctx),
+            ("auth", "logout") => AuthCommands.LogoutAsync(ctx),
+            _ => throw AdoException.Usage($"unknown command '{string.Join(' ', a.Positional.Take(2))}'. Run 'ado --help'."),
+        };
     }
 
     static Task<int> Print(string text)

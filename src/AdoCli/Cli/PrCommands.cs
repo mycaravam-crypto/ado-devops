@@ -67,7 +67,7 @@ public static class PrCommands
             throw new AdoException($"PR #{pr.PullRequestId} has no merge commits to compare yet");
 
         GitClient.Check("fetch", "--quiet", "origin", pr.TargetRefName, pr.SourceRefName);
-        return GitClient.Run(["diff", $"{pr.LastMergeTargetCommit.CommitId}...{pr.LastMergeSourceCommit.CommitId}"], capture: false).ExitCode;
+        return GitClient.Passthrough("diff", $"{pr.LastMergeTargetCommit.CommitId}...{pr.LastMergeSourceCommit.CommitId}");
     }
 
     public static async Task<int> CheckoutAsync(Context ctx)
@@ -80,7 +80,7 @@ public static class PrCommands
         var exists = GitClient.Run(["rev-parse", "--verify", "--quiet", $"refs/heads/{branch}"]).ExitCode == 0;
         foreach (var args in CheckoutCommands(branch, pr.SourceRefName, exists))
             GitClient.Check(args);
-        Console.WriteLine($"Switched to branch {branch} ({Output.Branch(pr.SourceRefName)})");
+        Console.Error.WriteLine($"Switched to branch {branch} ({Output.Branch(pr.SourceRefName)})");
         return 0;
     }
 
@@ -119,9 +119,9 @@ public static class PrCommands
     {
         var pr = await ctx.Client.GetPullRequestAsync(Id(ctx, "approve"));
         var me = (await ctx.Client.GetConnectionDataAsync()).AuthenticatedUser.Id;
-        await ctx.Client.VoteAsync(pr, me, 10);
-        Console.WriteLine($"Approved PR #{pr.PullRequestId}: {pr.Title}");
-        return 0;
+        var reviewer = await ctx.Client.VoteAsync(pr, me, 10);
+        Console.Error.WriteLine($"Approved PR #{pr.PullRequestId}: {pr.Title}");
+        return ctx.Json ? Output.WriteJson(reviewer) : 0;
     }
 
     public static async Task<int> MergeAsync(Context ctx)
@@ -130,7 +130,7 @@ public static class PrCommands
         if (pr.Status != "active")
             throw new AdoException($"PR #{pr.PullRequestId} is {pr.Status}, not active");
 
-        Console.WriteLine($"""
+        Console.Error.WriteLine($"""
             PR #{pr.PullRequestId}
             {pr.Title}
 
@@ -145,10 +145,10 @@ public static class PrCommands
         }
 
         var result = await ctx.Client.CompletePullRequestAsync(pr, ctx.Args.Has("--squash"));
-        Console.WriteLine(result.Status == "completed"
+        Console.Error.WriteLine(result.Status == "completed"
             ? $"Merged PR #{pr.PullRequestId}"
             : $"Completion requested for PR #{pr.PullRequestId}; it merges once policies pass and there are no conflicts");
-        return 0;
+        return ctx.Json ? Output.WriteJson(result) : 0;
     }
 
     static string CurrentBranch() => GitClient.Check("rev-parse", "--abbrev-ref", "HEAD");

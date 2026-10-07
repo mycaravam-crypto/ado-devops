@@ -39,6 +39,10 @@ public static class Program
 
           workitem list             list open work items assigned to you [--limit <n>]
           workitem show <id>        show a work item
+          workitem create           create a work item (prompts, or --type --title [--description]
+                                    [--assigned-to] [--area] [--iteration] [--tags] [--field Name=value])
+          workitem edit <id>        change fields: --title --description --state --assigned-to
+                                    --area --iteration --tags --comment --field Name=value
 
           build list                list builds of the project, newest first [--limit <n>]
           build show <id>           show a build
@@ -65,7 +69,9 @@ public static class Program
           --version         show version
         """;
 
-    public static string Version { get; } = Assembly.GetExecutingAssembly().GetName().Version!.ToString(3);
+    /// <summary>The informational version, e.g. 0.4.2 or 0.4.2-dev.3, without the "+commit" suffix the SDK appends.</summary>
+    public static string Version { get; } =
+        Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('+')[0];
 
     /// <summary>Entry point: runs one command and turns every error into a message on stderr and an exit code.</summary>
     public static async Task<int> Main(string[] argv)
@@ -139,6 +145,8 @@ public static class Program
             ("pr", "merge") => PrCommands.MergeAsync(ctx),
             ("workitem", "list") => WorkItemCommands.ListAsync(ctx),
             ("workitem", "show") => WorkItemCommands.ShowAsync(ctx),
+            ("workitem", "create") => WorkItemCommands.CreateAsync(ctx),
+            ("workitem", "edit") => WorkItemCommands.EditAsync(ctx),
             ("build", "list") => BuildCommands.ListAsync(ctx),
             ("build", "show") => BuildCommands.ShowAsync(ctx),
             ("build", "run") => BuildCommands.RunAsync(ctx),

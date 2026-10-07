@@ -44,6 +44,90 @@ public static partial class WorkItemCommands
         return 0;
     }
 
+    /// <summary>ado workitem create: from --type/--title and field options, or prompts for type, title and description when interactive.</summary>
+    public static async Task<int> CreateAsync(Context ctx)
+    {
+        var project = ctx.RequireProject();
+        var a = ctx.Args;
+        string type, title, description;
+        if (a.Get("--title") is { } t)
+        {
+            type = a.Get("--type") ?? throw AdoException.Usage("--type is required, e.g. --type Bug");
+            title = t;
+            description = a.Get("--description") ?? "";
+        }
+        else
+        {
+            if (Console.IsInputRedirected)
+                throw AdoException.Usage("--type and --title are required when not running interactively");
+            type = Term.Prompt("Type", a.Get("--type"));
+            title = Term.Prompt("Title");
+            description = Term.Prompt("Description", "");
+        }
+        if (type.Length == 0 || title.Length == 0)
+            throw AdoException.Usage("a type and a title are required");
+
+        var fields = Fields(a);
+        fields["System.Title"] = title;
+        if (description.Length > 0)
+            fields["System.Description"] = Html(description);
+
+        var w = await ctx.Client.CreateWorkItemAsync(project, type, fields);
+        if (ctx.Json)
+            return Output.WriteJson(w);
+        Console.WriteLine($"Created {w.Field("System.WorkItemType")} #{w.Id}: {w.Field("System.Title")}");
+        return 0;
+    }
+
+    /// <summary>ado workitem edit &lt;id&gt;: sets the fields given as options; others stay unchanged.</summary>
+    public static async Task<int> EditAsync(Context ctx)
+    {
+        var id = ctx.Id("workitem edit <id> [--title t] [--description d] [--state s] [--assigned-to who] [--field Name=value] ...");
+        var fields = Fields(ctx.Args);
+        if (fields.Count == 0)
+            throw AdoException.Usage("nothing to change; pass --title, --description, --state, --assigned-to, --area, --iteration, --tags, --comment or --field Name=value");
+
+        var w = await ctx.Client.UpdateWorkItemAsync(id, fields);
+        Console.Error.WriteLine($"Updated work item #{w.Id}: {w.Field("System.Title")}");
+        return ctx.Json ? Output.WriteJson(w) : 0;
+    }
+
+    static readonly (string Option, string Field)[] FieldOptions =
+    [
+        ("--title", "System.Title"),
+        ("--state", "System.State"),
+        ("--assigned-to", "System.AssignedTo"),
+        ("--area", "System.AreaPath"),
+        ("--iteration", "System.IterationPath"),
+        ("--tags", "System.Tags"),
+    ];
+
+    /// <summary>Fields to set from the options, keyed by reference name; --field Name=value comes last and wins.</summary>
+    public static Dictionary<string, string> Fields(Args a)
+    {
+        var fields = new Dictionary<string, string>();
+        foreach (var (option, field) in FieldOptions)
+            if (a.Get(option) is { } value)
+                fields[field] = value;
+        if (a.Get("--description") is { } description)
+            fields["System.Description"] = Html(description);
+        // System.History is the discussion: setting it adds a comment.
+        if (a.Get("--comment") is { } comment)
+            fields["System.History"] = Html(comment);
+        foreach (var f in a.GetAll("--field"))
+        {
+            var eq = f?.IndexOf('=') ?? -1;
+            if (eq <= 0)
+                throw AdoException.Usage($"--field expects Name=value, e.g. --field Microsoft.VSTS.Common.Priority=1 (got '{f}')");
+            fields[f![..eq]] = f[(eq + 1)..];
+        }
+        return fields;
+    }
+
+    /// <summary>Plain text as HTML for description and comment fields, keeping line breaks.</summary>
+    public static string Html(string text) =>
+        WebUtility.HtmlEncode(text).ReplaceLineEndings("<br>");
+
     // Shown in the header of `workitem show`, so not repeated in its field list.
     static readonly HashSet<string> HeaderFields = ["System.Id", "System.Title", "System.WorkItemType", "System.State", "System.AssignedTo"];
 

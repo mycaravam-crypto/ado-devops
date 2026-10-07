@@ -1,0 +1,65 @@
+# Every push to main becomes a release: tests pass, the next vX.Y.Z tag is created and a GitHub release with
+# generated notes is published. The merged PR's labels choose the bump: patch by default, "minor", "major",
+# or "no-release" to skip. Builds read the version from the latest tag (see src/AdoCli/AdoCli.csproj).
+name: release
+on:
+  push: { branches: [main] }
+permissions:
+  contents: write       # push the tag, create the release
+  pull-requests: read   # labels of the merged PR
+  issues: write         # create the bump labels on first run
+# One release at a time. A run still waiting is replaced by a newer one, whose version and notes then cover both merges.
+concurrency: { group: release, cancel-in-progress: false }
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { fetch-depth: 0 }   # all tags, to find the latest version
+
+      - name: Make sure the bump labels exist
+        run: |
+          gh label create major --color B60205 --description "Release: bump the major version" 2>/dev/null || true
+          gh label create minor --color FBCA04 --description "Release: bump the minor version" 2>/dev/null || true
+          gh label create no-release --color CCCCCC --description "Release: merge without a new version" 2>/dev/null || true
+
+      - name: Choose the bump from the merged PR's labels
+        id: bump
+        run: |
+          if [[ -n $(git tag --points-at HEAD 'v*') ]]; then
+            echo "level=none" >> "$GITHUB_OUTPUT"   # re-run of an already released commit
+            exit 0
+          fi
+          labels=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '.[0].labels[].name' || true)
+          level=patch
+          if grep -qx minor <<<"$labels"; then level=minor; fi
+          if grep -qx major <<<"$labels"; then level=major; fi
+          if grep -qx no-release <<<"$labels"; then level=none; fi
+          latest=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
+          echo "level=$level" >> "$GITHUB_OUTPUT"
+          if [[ $level != none ]]; then
+            echo "version=$(bash .github/scripts/next-version.sh "$latest" "$level")" >> "$GITHUB_OUTPUT"
+          fi
+          echo "latest tag: ${latest:-none}, bump: $level"
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        if: steps.bump.outputs.level != 'none'
+        with: { dotnet-version: 10.0.x }
+
+      - name: Build and test as the new version
+        if: steps.bump.outputs.level != 'none'
+        env: { VERSION: "${{ steps.bump.outputs.version }}" }
+        run: |
+          dotnet build ado.slnx --nologo -c Release -p:Version="$VERSION"
+          dotnet test ado.slnx --no-build --nologo -c Release
+          dotnet src/AdoCli/bin/Release/net10.0/ado.dll --version | grep -qx "ado $VERSION"
+
+      - name: Tag and publish the release
+        if: steps.bump.outputs.level != 'none'
+        env: { VERSION: "${{ steps.bump.outputs.version }}" }
+        run: |
+          git tag "v$VERSION" "$GITHUB_SHA"
+          git push origin "v$VERSION"
+          gh release create "v$VERSION" --verify-tag --generate-notes --title "v$VERSION"

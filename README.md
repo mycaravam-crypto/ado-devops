@@ -104,7 +104,7 @@ Don't put `ADO_PAT` in `~/.bashrc` or `$PROFILE`. Run `ado auth login` once inst
 
 ## Authentication
 
-Create a personal access token (PAT) in Azure DevOps Server (scopes: Code read & write, Work items read, Build read & execute), then:
+Create a personal access token (PAT) in Azure DevOps Server (scopes: Code read & write, Work items read & write, Build read & execute), then:
 
 ```bash
 ado auth login https://tfs.company.local/tfs/DefaultCollection   # prompts for the PAT
@@ -158,9 +158,29 @@ ado pr create                 # prompts; or --title t [--description d] [--sourc
 ```bash
 ado workitem list             # open items assigned to you (current project, if known); --limit n for the n most recently changed
 ado workitem show 4711        # title, type, state, assignee, then every other field the server returns
+ado workitem create           # prompts; or --type Bug --title t [--description d] [field options]
+ado workitem edit 4711 --state Active --assigned-to jane@company.local --comment "Picked up"
 ```
 
-Read-only: `ado` does not create or edit work items.
+Field options, for both `create` and `edit`:
+
+| Option | Field |
+|---|---|
+| `--title` | `System.Title` |
+| `--description` | `System.Description` (plain text; line breaks are kept) |
+| `--state` | `System.State` |
+| `--assigned-to` | `System.AssignedTo` (display name, e-mail or `DOMAIN\user`; `""` unassigns) |
+| `--area` | `System.AreaPath` |
+| `--iteration` | `System.IterationPath` |
+| `--tags` | `System.Tags` (`"a; b"`; replaces the existing tags) |
+| `--comment` | adds a comment to the discussion (`System.History`) |
+| `--field Name=value` | any field by reference name, e.g. `--field Microsoft.VSTS.Common.Priority=1`; can be repeated |
+
+- `workitem create` needs a project (see [Configuration](#configuration)). The type is the process template's name,
+  e.g. `Bug`, `Task` or `"User Story"`. When stdin is not a terminal, `--type` and `--title` are required.
+  It prints the new id; `--json` prints the whole work item.
+- `workitem edit` changes only the fields given and never prompts. The server checks the values: an unknown state,
+  user or field fails with its message and exit code 1. `--json` prints the updated work item.
 
 ## Builds
 
@@ -212,8 +232,8 @@ ado workitem show 4711 --json
 ado build show 815 --json
 ```
 
-Commands that change state (`pr create`, `pr approve`, `pr merge`, `build run`) never prompt when given
-`--title` / `--yes`. Credentials never appear in any output.
+Commands that change state (`pr create`, `pr approve`, `pr merge`, `workitem create`, `workitem edit`, `build run`)
+never prompt when given `--title` / `--yes`. Credentials never appear in any output.
 
 ## Configuration
 
@@ -369,3 +389,29 @@ Commands call `AdoClient` and `GitClient` directly. Every pull request runs two 
 `test` (`dotnet build` and `dotnet test`, also on `main`) and `docwizz`, which checks documentation coverage and the
 layering in [docwizz.yaml](docwizz.yaml) (`Cli` may use `Api` and `Git`, never the other way round) for problems the
 change introduces. See [PLAN.md](PLAN.md) for scope and non-goals.
+
+### Versions and releases
+
+Versions are bumped automatically. Every merge to `main` becomes a release: the `release` workflow builds and tests
+the commit, tags it `vX.Y.Z` and publishes a GitHub release with notes generated from the merged pull requests.
+Labels on the pull request choose the bump:
+
+| Label | Bump | Example |
+|---|---|---|
+| (none) | patch | 0.4.2 → 0.4.3 |
+| `minor` | minor | 0.4.2 → 0.5.0 |
+| `major` | major | 0.4.2 → 1.0.0 |
+| `no-release` | no new version | |
+
+The first release is `v0.1.0`. The workflow creates the labels the first time it runs. There is no version number to
+edit by hand: the git tag is the only place it lives.
+
+Builds read the version from the latest tag, so `ado --version` always says what you are running:
+
+| Build | `ado --version` |
+|---|---|
+| release, or a build of the tagged commit | `ado 0.4.2` |
+| 3 commits after `v0.4.2` | `ado 0.4.2-dev.3` |
+| without git or tags (e.g. a source archive) | `ado 0.0.0-dev` |
+
+To build a specific version yourself, pass it: `dotnet publish src/AdoCli -c Release -p:Version=1.2.3 ...`.

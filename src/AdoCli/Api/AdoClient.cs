@@ -154,7 +154,7 @@ public sealed class AdoClient
     public Task<Build> QueueBuildAsync(string project, int definitionId, string? sourceBranch) =>
         SendAsync<Build>(HttpMethod.Post, Url(project, "build/builds"), new { definition = new { id = definitionId }, sourceBranch });
 
-    /// <summary>Sends one request and deserializes the JSON answer; HTTP errors and rejected credentials become an <see cref="AdoException"/> with a matching exit code.</summary>
+    /// <summary>Sends one request, with <paramref name="body"/> serialized as JSON under <paramref name="contentType"/> (JSON Patch for work items), and deserializes the JSON answer; HTTP errors and rejected credentials become an <see cref="AdoException"/> with a matching exit code.</summary>
     public async Task<T> SendAsync<T>(HttpMethod method, string url, object? body = null, string contentType = "application/json")
     {
         using var request = new HttpRequestMessage(method, url);

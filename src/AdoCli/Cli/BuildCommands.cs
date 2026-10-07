@@ -4,9 +4,10 @@ using AdoCli.Api;
 
 public static class BuildCommands
 {
+    /// <summary>ado build list: builds of the current project, most recently queued first; all unless --limit is given.</summary>
     public static async Task<int> ListAsync(Context ctx)
     {
-        var builds = await ctx.Client.GetBuildsAsync(ctx.RequireProject());
+        var builds = await ctx.Client.GetBuildsAsync(ctx.RequireProject(), ctx.Limit);
         if (ctx.Json)
             return Output.WriteJson(builds);
 

@@ -28,6 +28,10 @@ public sealed class Context(Args args, Config? config = null)
 
     public string? Repo => args.Get("--repo") ?? Remote?.Repo;
 
+    /// <summary>--limit &lt;n&gt; caps what list commands fetch; null (the default) fetches everything.</summary>
+    public int? Limit => args.Get("--limit") is not { } v ? null
+        : int.TryParse(v, out var n) && n > 0 ? n : throw AdoException.Usage("--limit must be a positive number");
+
     public string RequireProject() => Project ??
         throw AdoException.Usage("could not determine the project; run inside a cloned repository or pass --project <name>");
 

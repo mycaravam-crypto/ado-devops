@@ -54,14 +54,14 @@ public sealed class AdoClient
     public Task<Repository> GetRepositoryAsync(string project, string repo) =>
         SendAsync<Repository>(HttpMethod.Get, Url(project, $"git/repositories/{Uri.EscapeDataString(repo)}"));
 
-    /// <summary>Pull requests of a repository, or of the whole project when <paramref name="repo"/> is null.</summary>
-    public async Task<List<PullRequest>> GetPullRequestsAsync(string project, string? repo, string status, Guid? creatorId)
+    /// <summary>Pull requests of a repository, or of the whole project when <paramref name="repo"/> is null; all of them unless <paramref name="limit"/> is set.</summary>
+    public Task<List<PullRequest>> GetPullRequestsAsync(string project, string? repo, string status, Guid? creatorId, int? limit = null)
     {
         var path = repo is null ? "git/pullrequests" : $"git/repositories/{Uri.EscapeDataString(repo)}/pullrequests";
-        var query = $"searchCriteria.status={Uri.EscapeDataString(status)}&$top=50";
+        var query = $"searchCriteria.status={Uri.EscapeDataString(status)}";
         if (creatorId is { } id)
             query += $"&searchCriteria.creatorId={id}";
-        return (await SendAsync<ListResponse<PullRequest>>(HttpMethod.Get, Url(project, path, query))).Value;
+        return PageAsync<PullRequest>(project, path, query, limit);
     }
 
     /// <summary>A pull request by id; ids are unique per collection, so no project or repository is needed.</summary>
@@ -86,11 +86,22 @@ public sealed class AdoClient
             completionOptions = new { squashMerge = squash },
         });
 
-    string PullRequestUrl(PullRequest pr, string suffix = "") =>
-        Url(pr.Repository.Project.Name, $"git/repositories/{pr.Repository.Id}/pullrequests/{pr.PullRequestId}{suffix}");
+    string PullRequestUrl(PullRequest pr, string suffix = "", string query = "") =>
+        Url(pr.Repository.Project.Name, $"git/repositories/{pr.Repository.Id}/pullrequests/{pr.PullRequestId}{suffix}", query);
 
-    public async Task<List<Commit>> GetPullRequestCommitsAsync(PullRequest pr) =>
-        (await SendAsync<ListResponse<Commit>>(HttpMethod.Get, PullRequestUrl(pr, "/commits"))).Value;
+    /// <summary>All commits of the PR; newer servers return them in pages linked by a continuation token.</summary>
+    public async Task<List<Commit>> GetPullRequestCommitsAsync(PullRequest pr)
+    {
+        var all = new List<Commit>();
+        string? token = null;
+        do
+        {
+            var query = token is null ? "" : $"continuationToken={Uri.EscapeDataString(token)}";
+            (var page, token) = await SendPageAsync<ListResponse<Commit>>(PullRequestUrl(pr, "/commits", query));
+            all.AddRange(page.Value);
+        } while (token is not null);
+        return all;
+    }
 
     public async Task<List<int>> GetPullRequestWorkItemIdsAsync(PullRequest pr) =>
         (await SendAsync<ListResponse<ResourceRef>>(HttpMethod.Get, PullRequestUrl(pr, "/workitems"))).Value.Select(r => int.Parse(r.Id)).Order().ToList();
@@ -100,34 +111,44 @@ public sealed class AdoClient
     {
         if (pr.LastMergeSourceCommit is null || pr.LastMergeTargetCommit is null)
             return [];
-        // ponytail: one page of 2000 changes; page with $skip if bigger PRs matter
+        const int pageSize = 2000;
         var query = $"baseVersion={pr.LastMergeTargetCommit.CommitId}&baseVersionType=commit" +
-            $"&targetVersion={pr.LastMergeSourceCommit.CommitId}&targetVersionType=commit&$top=2000";
-        var diffs = await SendAsync<CommitDiffs>(HttpMethod.Get, Url(pr.Repository.Project.Name, $"git/repositories/{pr.Repository.Id}/diffs/commits", query));
-        return diffs.Changes.Where(c => !c.Item.IsFolder).Select(c => new Change(c.Item.Path, c.ChangeType, c.OriginalPath)).OrderBy(c => c.Path, StringComparer.Ordinal).ToList();
+            $"&targetVersion={pr.LastMergeSourceCommit.CommitId}&targetVersionType=commit&$top={pageSize}";
+        var all = new List<GitChange>();
+        List<GitChange> page;
+        do
+        {
+            var url = Url(pr.Repository.Project.Name, $"git/repositories/{pr.Repository.Id}/diffs/commits", $"{query}&$skip={all.Count}");
+            page = (await SendAsync<CommitDiffs>(HttpMethod.Get, url)).Changes;
+            all.AddRange(page);
+        } while (page.Count == pageSize);
+        return all.Where(c => !c.Item.IsFolder).Select(c => new Change(c.Item.Path, c.ChangeType, c.OriginalPath)).OrderBy(c => c.Path, StringComparer.Ordinal).ToList();
     }
 
     public Task<WorkItem> GetWorkItemAsync(int id) =>
         SendAsync<WorkItem>(HttpMethod.Get, Url(null, $"wit/workitems/{id}"));
 
-    /// <summary>Open work items assigned to the current user, most recently changed first.</summary>
-    public async Task<List<WorkItem>> GetMyWorkItemsAsync(string? project)
+    /// <summary>Open work items assigned to the current user, most recently changed first; all of them (the server caps a query at 20000) unless <paramref name="limit"/> is set.</summary>
+    public async Task<List<WorkItem>> GetMyWorkItemsAsync(string? project, int? limit = null)
     {
         var inProject = project is null ? "" : " AND [System.TeamProject] = @project";
         var wiql = "SELECT [System.Id] FROM WorkItems WHERE [System.AssignedTo] = @Me AND [System.State] NOT IN ('Closed', 'Done', 'Removed')"
             + inProject + " ORDER BY [System.ChangedDate] DESC";
-        var result = await SendAsync<WiqlResult>(HttpMethod.Post, Url(project, "wit/wiql", "$top=50"), new { query = wiql });
+        var result = await SendAsync<WiqlResult>(HttpMethod.Post, Url(project, "wit/wiql", limit is { } top ? $"$top={top}" : ""), new { query = wiql });
         return await GetWorkItemsAsync(result.WorkItems.Select(w => w.Id));
     }
 
-    /// <summary>Title, type and state of the given work items; ones that are deleted or not visible are left out.</summary>
+    /// <summary>Title, type and state of the given work items, in the given order; ones that are deleted or not visible are left out.</summary>
     public async Task<List<WorkItem>> GetWorkItemsAsync(IEnumerable<int> ids)
     {
-        var list = string.Join(',', ids);
-        if (list.Length == 0)
-            return [];
-        var query = $"ids={list}&fields=System.Title,System.WorkItemType,System.State&errorPolicy=omit";
-        return (await SendAsync<ListResponse<WorkItem?>>(HttpMethod.Get, Url(null, "wit/workitems", query))).Value.OfType<WorkItem>().ToList();
+        // The server accepts at most 200 ids per request.
+        var all = new List<WorkItem>();
+        foreach (var chunk in ids.Chunk(200))
+        {
+            var query = $"ids={string.Join(',', chunk)}&fields=System.Title,System.WorkItemType,System.State&errorPolicy=omit";
+            all.AddRange((await SendAsync<ListResponse<WorkItem?>>(HttpMethod.Get, Url(null, "wit/workitems", query))).Value.OfType<WorkItem>());
+        }
+        return all;
     }
 
     /// <summary>Creates a work item of <paramref name="type"/> (e.g. Bug, Task, "User Story") with the given fields, keyed by reference name.</summary>
@@ -144,8 +165,23 @@ public sealed class AdoClient
     static object FieldPatch(IReadOnlyDictionary<string, string> fields) =>
         fields.Select(f => new { op = "add", path = "/fields/" + f.Key, value = f.Value }).ToArray();
 
-    public async Task<List<Build>> GetBuildsAsync(string project) =>
-        (await SendAsync<ListResponse<Build>>(HttpMethod.Get, Url(project, "build/builds", "queryOrder=queueTimeDescending&$top=20"))).Value;
+    /// <summary>Builds of the project, most recently queued first; all of them unless <paramref name="limit"/> is set.</summary>
+    public async Task<List<Build>> GetBuildsAsync(string project, int? limit = null)
+    {
+        // Builds are paged with a continuation token, not $skip.
+        const int pageSize = 1000;
+        var all = new List<Build>();
+        string? token = null;
+        do
+        {
+            var query = $"queryOrder=queueTimeDescending&$top={Math.Min(pageSize, limit - all.Count ?? pageSize)}";
+            if (token is not null)
+                query += $"&continuationToken={Uri.EscapeDataString(token)}";
+            (var page, token) = await SendPageAsync<ListResponse<Build>>(Url(project, "build/builds", query));
+            all.AddRange(page.Value);
+        } while (token is not null && (limit is null || all.Count < limit));
+        return all;
+    }
 
     public Task<Build> GetBuildAsync(string project, int id) =>
         SendAsync<Build>(HttpMethod.Get, Url(project, $"build/builds/{id}"));
@@ -154,8 +190,32 @@ public sealed class AdoClient
     public Task<Build> QueueBuildAsync(string project, int definitionId, string? sourceBranch) =>
         SendAsync<Build>(HttpMethod.Post, Url(project, "build/builds"), new { definition = new { id = definitionId }, sourceBranch });
 
-    /// <summary>Sends one request, with <paramref name="body"/> serialized as JSON under <paramref name="contentType"/> (JSON Patch for work items), and deserializes the JSON answer; HTTP errors and rejected credentials become an <see cref="AdoException"/> with a matching exit code.</summary>
-    public async Task<T> SendAsync<T>(HttpMethod method, string url, object? body = null, string contentType = "application/json")
+    /// <summary>Pages through a list with $top/$skip until the server returns a short page or <paramref name="limit"/> items are read.</summary>
+    async Task<List<T>> PageAsync<T>(string project, string path, string query, int? limit, int pageSize = 100)
+    {
+        var all = new List<T>();
+        while (limit is null || all.Count < limit)
+        {
+            var top = Math.Min(pageSize, limit - all.Count ?? pageSize);
+            var page = (await SendAsync<ListResponse<T>>(HttpMethod.Get, Url(project, path, $"{query}&$top={top}&$skip={all.Count}"))).Value;
+            all.AddRange(page);
+            if (page.Count < top)
+                break;
+        }
+        return all;
+    }
+
+    /// <summary>A GET of one page and the x-ms-continuationtoken header that points at the next one, null on the last page.</summary>
+    async Task<(T Page, string? Next)> SendPageAsync<T>(string url)
+    {
+        string? next = null;
+        var page = await SendAsync<T>(HttpMethod.Get, url, onResponse: r =>
+            next = r.Headers.TryGetValues("x-ms-continuationtoken", out var v) ? v.FirstOrDefault() is { Length: > 0 } t ? t : null : null);
+        return (page, next);
+    }
+
+    /// <summary>Sends one request, with <paramref name="body"/> serialized as JSON under <paramref name="contentType"/> (JSON Patch for work items), and deserializes the JSON answer; HTTP errors and rejected credentials become an <see cref="AdoException"/> with a matching exit code. <paramref name="onResponse"/> sees the successful response first, e.g. to read paging headers.</summary>
+    public async Task<T> SendAsync<T>(HttpMethod method, string url, object? body = null, string contentType = "application/json", Action<HttpResponseMessage>? onResponse = null)
     {
         using var request = new HttpRequestMessage(method, url);
         if (body is not null)
@@ -171,6 +231,7 @@ public sealed class AdoClient
         // Azure DevOps answers a rejected credential with a 203 HTML sign-in page.
         if (response.StatusCode == HttpStatusCode.NonAuthoritativeInformation)
             throw AuthFailed();
+        onResponse?.Invoke(response);
         return (await response.Content.ReadFromJsonAsync<T>(Json.Options))!;
     }
 

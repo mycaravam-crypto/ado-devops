@@ -102,6 +102,14 @@ in `$PROFILE`: `$env:PATH = "$HOME/.local/bin:$env:PATH"`.
 Don't put `ADO_PAT` in `~/.bashrc` or `$PROFILE`. Run `ado auth login` once instead (see below). It stores the token in
 `~/.ado/config.json`. On Linux and macOS only you can read that file. On Windows it is `%USERPROFILE%\.ado\config.json`, protected by your user profile's permissions.
 
+## Getting help
+
+```bash
+ado --help                    # overview: commands, global flags, environment variables, exit codes
+ado workitem --help           # one command's subcommands, flags and examples (also: ado workitem, ado help workitem)
+ado pr merge --help           # same as ado pr --help
+```
+
 ## Authentication
 
 Create a personal access token (PAT) in Azure DevOps Server (scopes: Code read & write, Work items read & write, Build read & execute), then:

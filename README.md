@@ -158,6 +158,7 @@ ado pr create                 # prompts; or --title t [--description d] [--sourc
 ```bash
 ado workitem list             # open items assigned to you (current project, if known); --limit n for the n most recently changed
 ado workitem list --type Bug --state Active,Resolved
+ado workitem list --all --state any --contains tzu   # everyone's items, any state, "tzu" in title or description
 ado workitem show 4711        # title, type, state, assignee, then every other field the server returns
 ado workitem create           # prompts; or --type Bug --title t [--description d] [field options]
 ado workitem edit 4711 --state Active --assigned-to jane@company.local --comment "Picked up"
@@ -182,11 +183,48 @@ Field options, for both `create` and `edit`:
   server matches them case-insensitively. Without `--state` it lists every state but Closed, Done and Removed; with it,
   closed items can be listed too (`--state Closed`). The filters go into the query, so `--limit n` returns the n most
   recently changed matches. `--json` prints the same fields.
+- More filters for `workitem list`, all ANDed into the query:
+
+  | Option | Keeps items |
+  |---|---|
+  | `--all` | of everyone, not just assigned to you |
+  | `--assigned-to who` | assigned to `who` (`@me` for you); replaces the default |
+  | `--state any` | in any state, closed ones included |
+  | `--area path`, `--iteration path` | under that area / iteration path |
+  | `--tag t` | with that tag; repeat or comma-separate for several (all must match) |
+  | `--title-contains text` | whose title contains `text` (ignoring case) |
+  | `--contains text` | whose title or description contains `text` |
+  | `--wiql "condition"` | matching a WIQL condition of your own, e.g. `--wiql "[Microsoft.VSTS.Common.Priority] = 1"` |
+
+  `--ids` prints only the ids, one per line, for piping into `workitem edit -`.
 - `workitem create` needs a project (see [Configuration](#configuration)). The type is the process template's name,
   e.g. `Bug`, `Task` or `"User Story"`. When stdin is not a terminal, `--type` and `--title` are required.
   It prints the new id; `--json` prints the whole work item.
-- `workitem edit` changes only the fields given and never prompts. The server checks the values: an unknown state,
+- `workitem edit` changes only the fields given. The server checks the values: an unknown state,
   user or field fails with its message and exit code 1. `--json` prints the updated work item.
+
+### Changing many work items at once
+
+`workitem edit` takes several ids, or `-` to read them from stdin, so a filtered list can be edited in one go:
+
+```bash
+# close every open Bug tagged xyz, whoever it is assigned to
+ado workitem list --all --type Bug --tag xyz --ids | ado workitem edit - --state Closed --comment "Bulk close" --yes
+
+# rename: replace "abc" with "xyz" in every title that contains it
+ado workitem list --all --state any --title-contains abc --ids | ado workitem edit - --replace-title abc --with xyz --dry-run
+
+ado workitem edit 4711 4712 4713 --assigned-to jane@company.local
+```
+
+- With more than one work item, `edit` lists them and the changes, then asks `Update n work items? [y/N]`.
+  `--yes` skips the question; it is required when stdin is not a terminal, which includes reading ids with `-`.
+- `--dry-run` only prints what would change (`--json`: id and fields per item) and changes nothing.
+- `--replace-title old --with new` replaces every occurrence of `old` in each title, ignoring case like
+  `--title-contains`. Items whose title does not contain it are skipped. It cannot be combined with `--title`.
+- Items are updated one by one. One the server rejects (a state the process does not allow, say) is reported as
+  `#id: message` and the rest are still updated; the exit code is then 1. `--json` prints the updated work items.
+- The state names depend on the process template: `Closed` (Agile, CMMI), `Done` (Scrum, Basic) or `Removed`.
 
 ## Builds
 

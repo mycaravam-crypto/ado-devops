@@ -38,12 +38,17 @@ public static class Program
           pr merge <id>             complete a pull request [--squash] [--yes]
 
           workitem list             list work items assigned to you, open ones by default
-                                    [--type <type>] [--state <state>] [--limit <n>]
+                                    [--all] [--assigned-to <who>] [--type <type>] [--state <state>|any]
+                                    [--area <path>] [--iteration <path>] [--tag <tag>]
+                                    [--title-contains <text>] [--contains <text>] [--wiql <condition>]
+                                    [--limit <n>] [--ids]
           workitem show <id>        show a work item
           workitem create           create a work item (prompts, or --type --title [--description]
                                     [--assigned-to] [--area] [--iteration] [--tags] [--field Name=value])
-          workitem edit <id>        change fields: --title --description --state --assigned-to
+          workitem edit <id>...     change fields: --title --description --state --assigned-to
                                     --area --iteration --tags --comment --field Name=value
+                                    --replace-title <old> --with <new>; - reads ids from stdin;
+                                    several ids are confirmed first [--yes] [--dry-run]
 
           build list                list builds of the project, newest first [--limit <n>]
           build show <id>           show a build

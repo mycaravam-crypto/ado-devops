@@ -129,20 +129,50 @@ public sealed class AdoClient
         SendAsync<WorkItem>(HttpMethod.Get, Url(null, $"wit/workitems/{id}"));
 
     /// <summary>
-    /// Work items assigned to the current user, most recently changed first; all of them (the server caps a query at 20000)
-    /// unless <paramref name="limit"/> is set. Only the given <paramref name="types"/> when there are any; only the given
-    /// <paramref name="states"/> when there are any, else every state but Closed, Done and Removed.
+    /// Work items matching <paramref name="filter"/> (default: open ones assigned to the current user), most recently changed
+    /// first; all of them (the server caps a query at 20000) unless <paramref name="limit"/> is set.
     /// </summary>
-    public async Task<List<WorkItem>> GetMyWorkItemsAsync(string? project, int? limit = null,
-        IReadOnlyCollection<string>? types = null, IReadOnlyCollection<string>? states = null)
+    public async Task<List<WorkItem>> QueryWorkItemsAsync(string? project, WorkItemFilter? filter = null, int? limit = null) =>
+        await GetWorkItemsAsync(await QueryWorkItemIdsAsync(project, filter, limit), [.. SummaryFields, .. ListFields]);
+
+    /// <summary>Only the ids of <see cref="QueryWorkItemsAsync"/>: one request, no fields.</summary>
+    public async Task<List<int>> QueryWorkItemIdsAsync(string? project, WorkItemFilter? filter = null, int? limit = null)
     {
-        var wiql = "SELECT [System.Id] FROM WorkItems WHERE [System.AssignedTo] = @Me"
-            + (states is { Count: > 0 } ? $" AND [System.State] IN ({WiqlList(states)})" : " AND [System.State] NOT IN ('Closed', 'Done', 'Removed')")
-            + (types is { Count: > 0 } ? $" AND [System.WorkItemType] IN ({WiqlList(types)})" : "")
-            + (project is null ? "" : " AND [System.TeamProject] = @project")
-            + " ORDER BY [System.ChangedDate] DESC";
+        var wiql = Wiql(filter ?? new(), project is not null);
         var result = await SendAsync<WiqlResult>(HttpMethod.Post, Url(project, "wit/wiql", limit is { } top ? $"$top={top}" : ""), new { query = wiql });
-        return await GetWorkItemsAsync(result.WorkItems.Select(w => w.Id), [.. SummaryFields, .. ListFields]);
+        return result.WorkItems.Select(w => w.Id).ToList();
+    }
+
+    /// <summary>The WIQL query for <paramref name="filter"/>; every condition is ANDed, values are quoted.</summary>
+    public static string Wiql(WorkItemFilter filter, bool inProject)
+    {
+        var where = new List<string>();
+        if (filter.AssignedTo is { } who)
+            where.Add(who.Equals("@me", StringComparison.OrdinalIgnoreCase) ? "[System.AssignedTo] = @Me" : $"[System.AssignedTo] = {Literal(who)}");
+        else if (!filter.Everyone)
+            where.Add("[System.AssignedTo] = @Me");
+        // --state any: no condition on the state at all.
+        if (!filter.States.Any(s => s.Equals("any", StringComparison.OrdinalIgnoreCase)))
+            where.Add(filter.States.Count > 0 ? $"[System.State] IN ({WiqlList(filter.States)})" : "[System.State] NOT IN ('Closed', 'Done', 'Removed')");
+        if (filter.Types.Count > 0)
+            where.Add($"[System.WorkItemType] IN ({WiqlList(filter.Types)})");
+        if (filter.Area is { } area)
+            where.Add($"[System.AreaPath] UNDER {Literal(area)}");
+        if (filter.Iteration is { } iteration)
+            where.Add($"[System.IterationPath] UNDER {Literal(iteration)}");
+        foreach (var tag in filter.Tags)
+            where.Add($"[System.Tags] CONTAINS {Literal(tag)}");
+        if (filter.TitleContains is { } title)
+            where.Add($"[System.Title] CONTAINS {Literal(title)}");
+        if (filter.Contains is { } text)
+            where.Add($"([System.Title] CONTAINS {Literal(text)} OR [System.Description] CONTAINS {Literal(text)})");
+        if (filter.Wiql is { Length: > 0 } raw)
+            where.Add($"({raw})");
+        if (inProject)
+            where.Add("[System.TeamProject] = @project");
+        return "SELECT [System.Id] FROM WorkItems"
+            + (where.Count > 0 ? " WHERE " + string.Join(" AND ", where) : "")
+            + " ORDER BY [System.ChangedDate] DESC";
     }
 
     // Enough to name a work item: what callers get unless they ask for more.
@@ -152,8 +182,9 @@ public sealed class AdoClient
     static readonly string[] ListFields = ["Microsoft.VSTS.Common.Priority", "System.IterationPath", "System.ChangedDate"];
 
     // WIQL string literals are single-quoted; a quote inside one is doubled.
-    static string WiqlList(IEnumerable<string> values) =>
-        string.Join(", ", values.Select(v => "'" + v.Replace("'", "''") + "'"));
+    static string Literal(string value) => "'" + value.Replace("'", "''") + "'";
+
+    static string WiqlList(IEnumerable<string> values) => string.Join(", ", values.Select(Literal));
 
     /// <summary>
     /// The given work items, in the given order, with <paramref name="fields"/> (default: title, type and state);

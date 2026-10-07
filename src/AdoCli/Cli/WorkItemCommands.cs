@@ -33,9 +33,40 @@ public static partial class WorkItemCommands
             State:    {w.Field("System.State")}
             Assigned: {w.Field("System.AssignedTo")}
             """);
-        if (PlainText(w.Field("System.Description")) is { Length: > 0 } description)
-            Console.WriteLine($"\nDescription:\n{description}");
+        var (rows, blocks) = OtherFields(w);
+        if (rows.Count > 0)
+        {
+            Console.WriteLine();
+            Output.Table(["FIELD", "VALUE"], rows);
+        }
+        foreach (var (name, text) in blocks)
+            Console.WriteLine($"\n{name}:\n{text}");
         return 0;
+    }
+
+    // Shown in the header of `workitem show`, so not repeated in its field list.
+    static readonly HashSet<string> HeaderFields = ["System.Id", "System.Title", "System.WorkItemType", "System.State", "System.AssignedTo"];
+
+    /// <summary>
+    /// Every field the header leaves out, sorted by reference name: one-line values as rows,
+    /// HTML or multi-line values (Description, Repro Steps, ...) as text blocks. Empty fields are skipped.
+    /// </summary>
+    public static (List<string[]> Rows, List<(string Name, string Text)> Blocks) OtherFields(WorkItem w)
+    {
+        var rows = new List<string[]>();
+        var blocks = new List<(string, string)>();
+        foreach (var name in w.Fields.Keys.Where(n => !HeaderFields.Contains(n)).Order(StringComparer.OrdinalIgnoreCase))
+        {
+            var value = w.Field(name);
+            var text = Tag().IsMatch(value) ? PlainText(value) : value.Trim();
+            if (text.Length == 0)
+                continue;
+            if (text.Contains('\n') || Tag().IsMatch(value))
+                blocks.Add((name, text));
+            else
+                rows.Add([name, text]);
+        }
+        return (rows, blocks);
     }
 
     /// <summary>Descriptions are HTML; line breaks are kept, other markup dropped.</summary>

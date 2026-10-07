@@ -35,6 +35,25 @@ public class WorkItemTests
     }
 
     [Fact]
+    public void ListsEveryFieldNotInTheHeader()
+    {
+        var w = System.Text.Json.JsonSerializer.Deserialize<WorkItem>("""
+            {"id":4711,"fields":{
+              "System.Title":"Improve","System.State":"Active","System.AssignedTo":{"displayName":"hannovb"},
+              "System.AreaPath":"Platform\\Import","Custom.Points":3,"System.Tags":"",
+              "System.CreatedBy":{"displayName":"anna"},
+              "System.Description":"<div>Do it</div><div>now</div>","Custom.Notes":"line 1\nline 2"}}
+            """, Json.Options)!;
+
+        var (rows, blocks) = WorkItemCommands.OtherFields(w);
+
+        Assert.Equal(
+            [["Custom.Points", "3"], ["System.AreaPath", "Platform\\Import"], ["System.CreatedBy", "anna"]],
+            rows);
+        Assert.Equal([("Custom.Notes", "line 1\nline 2"), ("System.Description", "Do it\nnow")], blocks);
+    }
+
+    [Fact]
     public void ConvertsHtmlDescriptionToText()
     {
         Assert.Equal("Do <it>\nnow", WorkItemCommands.PlainText("<div>Do &lt;it&gt;</div><div><b>now</b></div>"));

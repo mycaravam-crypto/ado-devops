@@ -157,7 +157,7 @@ ado pr create                 # prompts; or --title t [--description d] [--sourc
 
 ```bash
 ado workitem list             # open items assigned to you (current project, if known), up to 50
-ado workitem show 4711
+ado workitem show 4711        # title, type, state, assignee, then every other field the server returns
 ado workitem create           # prompts; or --type Bug --title t [--description d] [field options]
 ado workitem edit 4711 --state Active --assigned-to jane@company.local --comment "Picked up"
 ```

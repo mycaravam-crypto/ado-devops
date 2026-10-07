@@ -12,6 +12,25 @@ scriptable from the terminal.
 
 ---
 
+## Current state (version 0.1.0)
+
+All eight phases in section 32 are done, and so is the section 37 command set. The [README](README.md) describes
+what the CLI does today. The plan below is the original brief and is kept as written. These parts have been
+extended or changed since, each for a real requirement:
+
+| Plan | Now |
+|---|---|
+| §5–7, §18 commands | Added `ado repo status`, `ado pr context <id>` (one JSON document for scripts and local agents), `pr diff --json` and `--json` on `pr approve` / `pr merge` |
+| §6 configuration | `ado config list/get/set/unset` show each setting, its value and its source, and edit `~/.ado/config.json` with validation. Keys: `server`, `pat`, `project`, `apiVersion`, `insecure`, `caCert`, `proxy`, each with an `ADO_*` variable |
+| §17 structure | No `Auth/` or `Models/` folders: auth lives in `Cli/AuthCommands.cs`, models in `Api/Models.cs`. `Api/Tls.cs` and `Api/Proxy.cs` were added |
+| §18 API versioning | Instead of per-area constants, one version (default `5.0`, which works on Azure DevOps Server 2019–2022) is added in `AdoClient.Url`. It can be changed with `apiVersion` / `ADO_API_VERSION` |
+| §30 TLS | Internal servers needed it, so `--ca-cert` / `caCert` (preferred: an additional trusted CA, host name still checked) was added, along with an explicit `--insecure` / `insecure` that prints a warning on every use. Both are passed to git |
+| §30 security | Proxy support (`--proxy` / `proxy`, http(s) or SOCKS, `none` for direct). Passwords are masked in all output. Server URLs that contain credentials are rejected |
+| §21 output | Data goes to stdout. Messages, prompts and errors go to stderr, so `--json` output is always clean |
+| CI | GitHub workflows run build and tests (`test.yml`) and docwizz documentation and layering checks (`docwizz.yml`, rules in `docwizz.yaml`) on every PR |
+
+---
+
 ## 1. Goals
 
 ### Primary goal

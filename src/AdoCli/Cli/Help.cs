@@ -107,7 +107,7 @@ public static class Help
 
         Usage:
           ado pr list                   list pull requests of the repository (or of the project
-                                        outside a clone)
+                                        outside a clone) with their target branch
               --status <s>              active (default), completed, abandoned or all
               --mine                    only pull requests you created
           ado pr show <id>              show a pull request with its reviewers' votes

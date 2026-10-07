@@ -151,8 +151,8 @@ ado pr merge 142 [--squash] [--yes]
 ado pr create                 # prompts; or --title t [--description d] [--source b] [--target b]
 ```
 
-- `pr list` shows all pull requests of the current repository, or of the whole project outside a clone; `--limit n`
-  stops after n. Without `--status` it lists active ones.
+- `pr list` shows all pull requests of the current repository, or of the whole project outside a clone, with their
+  ID, title, author, target branch and status; `--limit n` stops after n. Without `--status` it lists active ones.
 - `pr checkout` and `pr diff` run git and must be run inside a clone of the PR's repository. If `pr/<id>` already
   exists, `pr checkout` only fast-forwards it, so local commits on it are never lost. `pr diff --json` lists the
   changed files from the server and works anywhere.

@@ -32,6 +32,14 @@ public class PullRequestTests
     }
 
     [Fact]
+    public void ListRowShowsTargetBranch()
+    {
+        var pr = JsonSerializer.Deserialize<PullRequest>(Pr, Json.Options)!;
+
+        Assert.Equal(["142", "Fix import validation", "hannovb", "main", "Active"], PrCommands.ListRow(pr));
+    }
+
+    [Fact]
     public async Task ListsAllPullRequestsPageByPage()
     {
         var stub = new StubHandler(n => StubHandler.Json(Page(n < 2 ? 100 : 7)));

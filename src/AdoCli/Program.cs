@@ -37,7 +37,8 @@ public static class Program
           pr approve <id>           approve a pull request
           pr merge <id>             complete a pull request [--squash] [--yes]
 
-          workitem list             list open work items assigned to you [--limit <n>]
+          workitem list             list work items assigned to you, open ones by default
+                                    [--type <type>] [--state <state>] [--limit <n>]
           workitem show <id>        show a work item
           workitem create           create a work item (prompts, or --type --title [--description]
                                     [--assigned-to] [--area] [--iteration] [--tags] [--field Name=value])

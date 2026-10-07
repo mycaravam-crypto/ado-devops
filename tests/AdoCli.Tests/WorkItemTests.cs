@@ -63,6 +63,68 @@ public class WorkItemTests
     }
 
     [Fact]
+    public async Task DefaultQueryListsOpenItemsWithListFields()
+    {
+        var stub = new StubHandler(n => n == 0
+            ? StubHandler.Json("""{"workItems":[{"id":7}]}""")
+            : StubHandler.Json("""{"value":[{"id":7,"fields":{}}]}"""));
+
+        await new AdoClient("https://tfs", "pat", handler: stub).GetMyWorkItemsAsync("Platform");
+
+        var query = (string)JsonNode.Parse(stub.Requests[0].Body!)!["query"]!;
+        Assert.Equal("SELECT [System.Id] FROM WorkItems WHERE [System.AssignedTo] = @Me AND [System.State] NOT IN ('Closed', 'Done', 'Removed')" +
+            " AND [System.TeamProject] = @project ORDER BY [System.ChangedDate] DESC", query);
+        Assert.EndsWith("ids=7&fields=System.Title,System.WorkItemType,System.State,Microsoft.VSTS.Common.Priority," +
+            "System.IterationPath,System.ChangedDate&errorPolicy=omit&api-version=5.0", stub.Requests[1].Url);
+    }
+
+    [Fact]
+    public async Task TypeAndStateFiltersGoIntoTheQuery()
+    {
+        var stub = new StubHandler(HttpStatusCode.OK, """{"workItems":[]}""");
+
+        await new AdoClient("https://tfs", "pat", handler: stub).GetMyWorkItemsAsync(null, types: ["Bug", "User Story"], states: ["Closed", "Won't Fix"]);
+
+        var query = (string)JsonNode.Parse(stub.Requests.Single().Body!)!["query"]!;
+        Assert.Equal("SELECT [System.Id] FROM WorkItems WHERE [System.AssignedTo] = @Me AND [System.State] IN ('Closed', 'Won''t Fix')" +
+            " AND [System.WorkItemType] IN ('Bug', 'User Story') ORDER BY [System.ChangedDate] DESC", query);
+    }
+
+    [Fact]
+    public async Task ListCommandPassesRepeatedAndCommaSeparatedFilters()
+    {
+        var stub = new StubHandler(HttpStatusCode.OK, """{"workItems":[]}""");
+
+        var code = await WorkItemCommands.ListAsync(Ctx(stub, "workitem", "list", "--project", "Platform",
+            "--type", "Bug, User Story", "--type", "bug", "--state", "Active"));
+
+        Assert.Equal(0, code);
+        var query = (string)JsonNode.Parse(stub.Requests.Single().Body!)!["query"]!;
+        Assert.Contains("[System.State] IN ('Active')", query);
+        Assert.Contains("[System.WorkItemType] IN ('Bug', 'User Story')", query);
+    }
+
+    [Fact]
+    public void ListRowShowsDetails()
+    {
+        var w = System.Text.Json.JsonSerializer.Deserialize<WorkItem>("""
+            {"id":4711,"fields":{"System.Title":"Improve","System.WorkItemType":"Bug","System.State":"Active",
+              "Microsoft.VSTS.Common.Priority":2,"System.IterationPath":"Platform\\Sprint 42","System.ChangedDate":"2026-10-05T12:00:00Z"}}
+            """, Json.Options)!;
+
+        var expectedDate = DateTimeOffset.Parse("2026-10-05T12:00:00Z").ToLocalTime().ToString("yyyy-MM-dd");
+        Assert.Equal(["4711", "Bug", "Active", "2", "Platform\\Sprint 42", expectedDate, "Improve"], WorkItemCommands.ListRow(w));
+    }
+
+    [Fact]
+    public void ListRowLeavesMissingFieldsEmpty()
+    {
+        var w = new WorkItem(1, []);
+
+        Assert.Equal(["1", "", "", "", "", "", ""], WorkItemCommands.ListRow(w));
+    }
+
+    [Fact]
     public void ListsEveryFieldNotInTheHeader()
     {
         var w = System.Text.Json.JsonSerializer.Deserialize<WorkItem>("""

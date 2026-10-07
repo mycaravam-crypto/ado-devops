@@ -28,7 +28,7 @@ public class WorkItemTests
     {
         var stub = new StubHandler(HttpStatusCode.OK, """{"workItems":[]}""");
 
-        var items = await new AdoClient("https://tfs", "pat", handler: stub).GetMyWorkItemsAsync("Platform");
+        var items = await new AdoClient("https://tfs", "pat", handler: stub).QueryWorkItemsAsync("Platform");
 
         Assert.Empty(items);
         Assert.Contains("@Me", stub.Requests.Single().Body);
@@ -42,7 +42,7 @@ public class WorkItemTests
             ? StubHandler.Json($$"""{"workItems":[{{refs}}]}""")
             : StubHandler.Json("""{"value":[{"id":1,"fields":{}}]}"""));
 
-        var items = await new AdoClient("https://tfs", "pat", handler: stub).GetMyWorkItemsAsync("Platform");
+        var items = await new AdoClient("https://tfs", "pat", handler: stub).QueryWorkItemsAsync("Platform");
 
         Assert.Equal("https://tfs/Platform/_apis/wit/wiql?api-version=5.0", stub.Requests[0].Url);
         Assert.Equal(4, stub.Requests.Count);
@@ -57,7 +57,7 @@ public class WorkItemTests
     {
         var stub = new StubHandler(HttpStatusCode.OK, """{"workItems":[]}""");
 
-        await new AdoClient("https://tfs", "pat", handler: stub).GetMyWorkItemsAsync("Platform", limit: 10);
+        await new AdoClient("https://tfs", "pat", handler: stub).QueryWorkItemsAsync("Platform", limit: 10);
 
         Assert.Equal("https://tfs/Platform/_apis/wit/wiql?$top=10&api-version=5.0", stub.Requests[0].Url);
     }
@@ -69,7 +69,7 @@ public class WorkItemTests
             ? StubHandler.Json("""{"workItems":[{"id":7}]}""")
             : StubHandler.Json("""{"value":[{"id":7,"fields":{}}]}"""));
 
-        await new AdoClient("https://tfs", "pat", handler: stub).GetMyWorkItemsAsync("Platform");
+        await new AdoClient("https://tfs", "pat", handler: stub).QueryWorkItemsAsync("Platform");
 
         var query = (string)JsonNode.Parse(stub.Requests[0].Body!)!["query"]!;
         Assert.Equal("SELECT [System.Id] FROM WorkItems WHERE [System.AssignedTo] = @Me AND [System.State] NOT IN ('Closed', 'Done', 'Removed')" +
@@ -83,7 +83,7 @@ public class WorkItemTests
     {
         var stub = new StubHandler(HttpStatusCode.OK, """{"workItems":[]}""");
 
-        await new AdoClient("https://tfs", "pat", handler: stub).GetMyWorkItemsAsync(null, types: ["Bug", "User Story"], states: ["Closed", "Won't Fix"]);
+        await new AdoClient("https://tfs", "pat", handler: stub).QueryWorkItemsAsync(null, new() { Types = ["Bug", "User Story"], States = ["Closed", "Won't Fix"] });
 
         var query = (string)JsonNode.Parse(stub.Requests.Single().Body!)!["query"]!;
         Assert.Equal("SELECT [System.Id] FROM WorkItems WHERE [System.AssignedTo] = @Me AND [System.State] IN ('Closed', 'Won''t Fix')" +
@@ -259,6 +259,129 @@ public class WorkItemTests
         var stub = new StubHandler(HttpStatusCode.OK);
 
         var e = await Assert.ThrowsAsync<AdoException>(() => WorkItemCommands.EditAsync(Ctx(stub, "workitem", "edit", "4711")));
+
+        Assert.Equal(AdoException.InvalidUsage, e.ExitCode);
+        Assert.Empty(stub.Requests);
+    }
+
+    [Fact]
+    public void FilterOptionsGoIntoTheQuery()
+    {
+        var a = Args.Parse(["workitem", "list", "--all", "--state", "any", "--area", "Platform\\Import", "--iteration", "Platform\\Sprint 42",
+            "--tag", "release,ui", "--title-contains", "abc", "--contains", "don't", "--wiql", "[Microsoft.VSTS.Common.Priority] = 1"]);
+
+        var wiql = AdoClient.Wiql(WorkItemCommands.Filter(a), inProject: true);
+
+        Assert.Equal("SELECT [System.Id] FROM WorkItems WHERE [System.AreaPath] UNDER 'Platform\\Import'" +
+            " AND [System.IterationPath] UNDER 'Platform\\Sprint 42' AND [System.Tags] CONTAINS 'release' AND [System.Tags] CONTAINS 'ui'" +
+            " AND [System.Title] CONTAINS 'abc' AND ([System.Title] CONTAINS 'don''t' OR [System.Description] CONTAINS 'don''t')" +
+            " AND ([Microsoft.VSTS.Common.Priority] = 1) AND [System.TeamProject] = @project ORDER BY [System.ChangedDate] DESC", wiql);
+    }
+
+    [Theory]
+    [InlineData("jane@company.local", "[System.AssignedTo] = 'jane@company.local'")]
+    [InlineData("@me", "[System.AssignedTo] = @Me")]
+    public void AssignedToReplacesTheDefaultAssignee(string who, string condition)
+    {
+        var wiql = AdoClient.Wiql(new WorkItemFilter { AssignedTo = who }, inProject: false);
+
+        Assert.Equal($"SELECT [System.Id] FROM WorkItems WHERE {condition} AND [System.State] NOT IN ('Closed', 'Done', 'Removed')" +
+            " ORDER BY [System.ChangedDate] DESC", wiql);
+    }
+
+    [Fact]
+    public void AllWithAnyStateHasNoConditions()
+    {
+        Assert.Equal("SELECT [System.Id] FROM WorkItems ORDER BY [System.ChangedDate] DESC",
+            AdoClient.Wiql(new WorkItemFilter { Everyone = true, States = ["Any"] }, inProject: false));
+    }
+
+    [Fact]
+    public async Task ListIdsSkipsFetchingFields()
+    {
+        var stub = new StubHandler(HttpStatusCode.OK, """{"workItems":[{"id":7},{"id":9}]}""");
+
+        var code = await WorkItemCommands.ListAsync(Ctx(stub, "workitem", "list", "--all", "--ids"));
+
+        Assert.Equal(0, code);
+        Assert.EndsWith("/wit/wiql?api-version=5.0", stub.Requests.Single().Url);
+    }
+
+    [Fact]
+    public void EditIdsReadsArgumentsAndStdin()
+    {
+        var a = Args.Parse(["workitem", "edit", "3", "-", "#5"]);
+
+        Assert.Equal([3, 1, 2, 5], WorkItemCommands.EditIds(a, new StringReader("1\n2 3\n")));
+    }
+
+    [Theory]
+    [InlineData("abc")]
+    [InlineData("0")]
+    public void EditIdsRejectsNonIds(string token)
+    {
+        var e = Assert.Throws<AdoException>(() => WorkItemCommands.EditIds(Args.Parse(["workitem", "edit", "-"]), new StringReader(token)));
+        Assert.Equal(AdoException.InvalidUsage, e.ExitCode);
+    }
+
+    [Fact]
+    public void ReplaceTitleIgnoresCaseAndSkipsUnmatchedTitles()
+    {
+        WorkItem[] items =
+        [
+            new(1, new() { ["System.Title"] = Str("Fix ABC import") }),
+            new(2, new() { ["System.Title"] = Str("Unrelated") }),
+        ];
+
+        var changes = WorkItemCommands.Changes(items, new Dictionary<string, string> { ["System.History"] = "renamed" }, "abc", "xyz");
+
+        var (item, fields) = Assert.Single(changes);
+        Assert.Equal(1, item.Id);
+        Assert.Equal("Fix xyz import", fields["System.Title"]);
+        Assert.Equal("renamed", fields["System.History"]);
+    }
+
+    static System.Text.Json.JsonElement Str(string s) => System.Text.Json.JsonSerializer.SerializeToElement(s);
+
+    [Fact]
+    public async Task BulkEditWithYesUpdatesEachAndReportsFailures()
+    {
+        var stub = new StubHandler(n => n switch
+        {
+            0 => StubHandler.Json("""{"value":[{"id":1,"fields":{"System.Title":"a"}},{"id":2,"fields":{"System.Title":"b"}}]}"""),
+            1 => new HttpResponseMessage(HttpStatusCode.BadRequest) { Content = new StringContent("""{"message":"invalid state"}""") },
+            _ => StubHandler.Json("""{"id":2,"fields":{"System.Title":"b"}}"""),
+        });
+
+        var code = await WorkItemCommands.EditAsync(Ctx(stub, "workitem", "edit", "1", "2", "--state", "Closed", "--yes"));
+
+        Assert.Equal(AdoException.General, code);
+        Assert.Equal(3, stub.Requests.Count);
+        Assert.Contains("ids=1,2&", stub.Requests[0].Url);
+        Assert.Equal("https://tfs/_apis/wit/workitems/1?api-version=5.0", stub.Requests[1].Url);
+        Assert.Equal("https://tfs/_apis/wit/workitems/2?api-version=5.0", stub.Requests[2].Url);
+        Assert.Contains("\"Closed\"", stub.Requests[2].Body);
+    }
+
+    [Fact]
+    public async Task BulkEditDryRunChangesNothing()
+    {
+        var stub = new StubHandler(HttpStatusCode.OK, """{"value":[{"id":1,"fields":{"System.Title":"abc"}},{"id":2,"fields":{"System.Title":"abc"}}]}""");
+
+        var code = await WorkItemCommands.EditAsync(Ctx(stub, "workitem", "edit", "1", "2", "--replace-title", "abc", "--with", "xyz", "--dry-run"));
+
+        Assert.Equal(0, code);
+        Assert.Single(stub.Requests);
+    }
+
+    [Theory]
+    [InlineData("--replace-title", "abc")]
+    [InlineData("--replace-title", "abc", "--with", "x", "--title", "t")]
+    public async Task ReplaceTitleNeedsWithAndNoTitle(params string[] options)
+    {
+        var stub = new StubHandler(HttpStatusCode.OK);
+
+        var e = await Assert.ThrowsAsync<AdoException>(() => WorkItemCommands.EditAsync(Ctx(stub, ["workitem", "edit", "1", .. options])));
 
         Assert.Equal(AdoException.InvalidUsage, e.ExitCode);
         Assert.Empty(stub.Requests);

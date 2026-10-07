@@ -55,13 +55,14 @@ public static class Output
         return 0;
     }
 
-    /// <summary>Left-aligned columns separated by two spaces; the last column is not padded.</summary>
-    public static void Table(string[] headers, IEnumerable<string[]> rows)
+    /// <summary>Left-aligned columns separated by two spaces; the last column is not padded. Written to <paramref name="to"/>, by default stdout.</summary>
+    public static void Table(string[] headers, IEnumerable<string[]> rows, TextWriter? to = null)
     {
+        to ??= Console.Out;
         var all = rows.Prepend(headers).ToList();
         var widths = headers.Select((_, i) => all.Max(r => r[i].Length)).ToArray();
         foreach (var row in all)
-            Console.WriteLine(string.Concat(row.Select((cell, i) => i == row.Length - 1 ? cell : cell.PadRight(widths[i] + 2))));
+            to.WriteLine(string.Concat(row.Select((cell, i) => i == row.Length - 1 ? cell : cell.PadRight(widths[i] + 2))));
     }
 
     /// <summary>"active" → "Active", colored only when writing to a terminal.</summary>

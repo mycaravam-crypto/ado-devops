@@ -21,7 +21,7 @@ extended or changed since, each for a real requirement:
 | Plan | Now |
 |---|---|
 | §5–7, §18 commands | Added `ado repo status`, `ado pr context <id>` (one JSON document for scripts and local agents), `pr diff --json` and `--json` on `pr approve` / `pr merge` |
-| §15 work items | `ado workitem create` and `ado workitem edit <id>` set fields through named options or `--field Name=value`. `ado workitem list` filters by `--type` / `--state` in the query and shows priority, iteration and date last changed |
+| §15 work items | `ado workitem create` and `ado workitem edit <id>` set fields through named options or `--field Name=value`. `ado workitem list` filters by type, state, assignee (`--all` for everyone), area, iteration, tag, title or description text and raw `--wiql` in the query and shows priority, iteration and date last changed; `--ids` pipes into `ado workitem edit -`, which edits many items with a preview, confirmation (`--yes`), `--dry-run` and `--replace-title old --with new` |
 | §6 configuration | `ado config list/get/set/unset` show each setting, its value and its source, and edit `~/.ado/config.json` with validation. Keys: `server`, `pat`, `project`, `apiVersion`, `insecure`, `caCert`, `proxy`, each with an `ADO_*` variable |
 | §17 structure | No `Auth/` or `Models/` folders: auth lives in `Cli/AuthCommands.cs`, models in `Api/Models.cs`. `Api/Tls.cs` and `Api/Proxy.cs` were added |
 | §18 API versioning | Instead of per-area constants, one version (default `5.0`, which works on Azure DevOps Server 2019–2022) is added in `AdoClient.Url`. It can be changed with `apiVersion` / `ADO_API_VERSION` |

@@ -64,6 +64,26 @@ public sealed record WorkItemRef(int Id);
 
 public sealed record WiqlResult(List<WorkItemRef> WorkItems);
 
+/// <summary>
+/// Which work items a query returns. By default open ones assigned to the current user; <see cref="Everyone"/> drops the
+/// assignee condition, a state of "any" the state condition. Text matches (CONTAINS) ignore case.
+/// </summary>
+public sealed record WorkItemFilter
+{
+    public bool Everyone { get; init; }
+    public string? AssignedTo { get; init; }
+    public IReadOnlyCollection<string> Types { get; init; } = [];
+    public IReadOnlyCollection<string> States { get; init; } = [];
+    public string? Area { get; init; }
+    public string? Iteration { get; init; }
+    public IReadOnlyCollection<string> Tags { get; init; } = [];
+    public string? TitleContains { get; init; }
+    /// <summary>Text in the title or the description.</summary>
+    public string? Contains { get; init; }
+    /// <summary>A WIQL condition of its own, ANDed with the rest.</summary>
+    public string? Wiql { get; init; }
+}
+
 public sealed record DefinitionRef(int Id, string Name);
 
 public sealed record Link(string Href);

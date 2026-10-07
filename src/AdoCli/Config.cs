@@ -1,6 +1,7 @@
 namespace AdoCli;
 
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using AdoCli.Api;
 using AdoCli.Cli;
 
@@ -16,6 +17,13 @@ public sealed class Config
     /// <summary>PEM file with the CA certificate(s) the server's certificate is issued by, trusted in addition to the system's.</summary>
     public string? CaCert { get; init; }
 
+    /// <summary>Where each loaded value came from: the environment variable's name, or "config file".</summary>
+    [JsonIgnore]
+    public IReadOnlyDictionary<string, string> Sources { get; init; } = new Dictionary<string, string>();
+
+    /// <summary>The keys of the config file, as <c>ado config</c> names them.</summary>
+    public static readonly string[] Keys = ["server", "pat", "project", "apiVersion", "insecure", "caCert"];
+
     public static string DefaultPath { get; } =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".ado", "config.json");
 
@@ -23,14 +31,26 @@ public sealed class Config
     public static Config Load(string? path = null)
     {
         var file = ReadFile(path ?? DefaultPath);
+        var sources = new Dictionary<string, string>();
+        string? Pick(string key, string env, string? fromFile)
+        {
+            var value = Env(env) ?? fromFile;
+            if (value is not null)
+                sources[key] = Env(env) is null ? "config file" : env;
+            return value;
+        }
+
+        // A file value is a JSON bool, so only the environment variable can fail to parse.
+        var insecure = Pick("insecure", "ADO_INSECURE", file?.Insecure?.ToString());
         return new Config
         {
-            Server = Env("ADO_SERVER") ?? file?.Server,
-            Pat = Env("ADO_PAT") ?? file?.Pat,
-            Project = Env("ADO_PROJECT") ?? file?.Project,
-            ApiVersion = Env("ADO_API_VERSION") ?? file?.ApiVersion,
-            Insecure = Env("ADO_INSECURE") is { } insecure ? Bool("ADO_INSECURE", insecure) : file?.Insecure,
-            CaCert = Env("ADO_CA_CERT") ?? file?.CaCert,
+            Server = Pick("server", "ADO_SERVER", file?.Server),
+            Pat = Pick("pat", "ADO_PAT", file?.Pat),
+            Project = Pick("project", "ADO_PROJECT", file?.Project),
+            ApiVersion = Pick("apiVersion", "ADO_API_VERSION", file?.ApiVersion),
+            Insecure = insecure is null ? null : ParseBool("ADO_INSECURE", insecure),
+            CaCert = Pick("caCert", "ADO_CA_CERT", file?.CaCert),
+            Sources = sources,
         };
     }
 
@@ -61,7 +81,8 @@ public sealed class Config
         JsonSerializer.Serialize(file, this, Json.Options);
     }
 
-    static bool Bool(string name, string value) => value.ToLowerInvariant() switch
+    /// <summary>1/true/yes or 0/false/no, any case; <paramref name="name"/> says where the value came from in the error.</summary>
+    public static bool ParseBool(string name, string value) => value.ToLowerInvariant() switch
     {
         "1" or "true" or "yes" => true,
         "0" or "false" or "no" => false,

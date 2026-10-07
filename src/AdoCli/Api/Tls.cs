@@ -10,8 +10,8 @@ public sealed record Tls(bool Insecure = false, string? CaCert = null)
 {
     public const string UntrustedHint =
         "the server's TLS certificate is not trusted.\n\n" +
-        "If your server uses a company CA, set ADO_CA_CERT (or \"caCert\" in ~/.ado/config.json) to its PEM file.\n" +
-        "To skip certificate checks entirely (internal servers only), pass --insecure or set ADO_INSECURE=1.";
+        "If your server uses a company CA, trust its PEM file: ado config set caCert <file> (or --ca-cert / ADO_CA_CERT).\n" +
+        "To skip certificate checks entirely (internal servers only): ado config set insecure true (or --insecure / ADO_INSECURE=1).";
 
     /// <summary>The HTTP handler for <see cref="AdoClient"/>; the CA file is read here so a bad path fails before any request.</summary>
     public HttpMessageHandler CreateHandler()

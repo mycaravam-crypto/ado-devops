@@ -170,14 +170,11 @@ public static partial class WorkItemCommands
         if (dryRun && ctx.Json)
             return Output.WriteJson(changes.Select(c => new { c.Item.Id, c.Fields }));
 
-        var preview = dryRun ? Console.Out : Console.Error;
         if (changes.Count == 0)
-        {
             Console.Error.WriteLine(find is null ? "No work items to update." : $"No title contains '{find}'; nothing to update.");
-            return failed > 0 ? AdoException.General : 0;
-        }
-        Preview(preview, changes, fields, find is not null);
-        if (dryRun)
+        else
+            Preview(dryRun ? Console.Out : Console.Error, changes, fields, find is not null);
+        if (changes.Count == 0 || dryRun)
             return failed > 0 ? AdoException.General : 0;
 
         if (changes.Count > 1 && !a.Has("--yes") && !a.Has("-y"))
@@ -223,8 +220,6 @@ public static partial class WorkItemCommands
         var tokens = new List<string>();
         foreach (var arg in a.Positional.Skip(2))
             tokens.AddRange(arg == "-" ? stdin.ReadToEnd().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries) : [arg]);
-        if (tokens.Count == 0 && !a.Positional.Skip(2).Contains("-"))
-            throw AdoException.Usage(EditUsage);
         var ids = new List<int>();
         foreach (var token in tokens)
             ids.Add(int.TryParse(token.TrimStart('#'), out var id) && id > 0 ? id : throw AdoException.Usage($"not a work item id: '{token}'"));

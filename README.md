@@ -273,11 +273,13 @@ ado repo status --json        # where am I?
 ado pr context 142 --json     # PR, reviewers, commits, changed files, linked work items
 ado pr diff 142 --json        # changed files; without --json, the full unified diff
 ado workitem show 4711 --json
+ado workitem list --all --tag xyz --ids   # ids only, one per line, for `ado workitem edit -`
 ado build show 815 --json
 ```
 
 Commands that change state (`pr create`, `pr approve`, `pr merge`, `workitem create`, `workitem edit`, `build run`)
-never prompt when given `--title` / `--yes`. Credentials never appear in any output.
+never prompt when given `--title` / `--yes`; `workitem edit` on several items fails instead of prompting when stdin
+is not a terminal and `--yes` is missing. Credentials never appear in any output.
 
 ## Configuration
 

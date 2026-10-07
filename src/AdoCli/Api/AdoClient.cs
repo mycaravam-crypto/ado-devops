@@ -130,6 +130,20 @@ public sealed class AdoClient
         return (await SendAsync<ListResponse<WorkItem?>>(HttpMethod.Get, Url(null, "wit/workitems", query))).Value.OfType<WorkItem>().ToList();
     }
 
+    /// <summary>Creates a work item of <paramref name="type"/> (e.g. Bug, Task, "User Story") with the given fields, keyed by reference name.</summary>
+    public Task<WorkItem> CreateWorkItemAsync(string project, string type, IReadOnlyDictionary<string, string> fields) =>
+        SendAsync<WorkItem>(HttpMethod.Post, Url(project, $"wit/workitems/${Uri.EscapeDataString(type)}"), FieldPatch(fields), JsonPatch);
+
+    /// <summary>Sets the given fields of a work item; fields not listed stay as they are.</summary>
+    public Task<WorkItem> UpdateWorkItemAsync(int id, IReadOnlyDictionary<string, string> fields) =>
+        SendAsync<WorkItem>(HttpMethod.Patch, Url(null, $"wit/workitems/{id}"), FieldPatch(fields), JsonPatch);
+
+    const string JsonPatch = "application/json-patch+json";
+
+    // "add" on a field sets it, whether or not it has a value yet.
+    static object FieldPatch(IReadOnlyDictionary<string, string> fields) =>
+        fields.Select(f => new { op = "add", path = "/fields/" + f.Key, value = f.Value }).ToArray();
+
     public async Task<List<Build>> GetBuildsAsync(string project) =>
         (await SendAsync<ListResponse<Build>>(HttpMethod.Get, Url(project, "build/builds", "queryOrder=queueTimeDescending&$top=20"))).Value;
 
@@ -141,11 +155,11 @@ public sealed class AdoClient
         SendAsync<Build>(HttpMethod.Post, Url(project, "build/builds"), new { definition = new { id = definitionId }, sourceBranch });
 
     /// <summary>Sends one request and deserializes the JSON answer; HTTP errors and rejected credentials become an <see cref="AdoException"/> with a matching exit code.</summary>
-    public async Task<T> SendAsync<T>(HttpMethod method, string url, object? body = null)
+    public async Task<T> SendAsync<T>(HttpMethod method, string url, object? body = null, string contentType = "application/json")
     {
         using var request = new HttpRequestMessage(method, url);
         if (body is not null)
-            request.Content = new StringContent(JsonSerializer.Serialize(body, Json.Options), Encoding.UTF8, "application/json");
+            request.Content = new StringContent(JsonSerializer.Serialize(body, Json.Options), Encoding.UTF8, contentType);
 
         var sw = Stopwatch.StartNew();
         using var response = await _http.SendAsync(request);

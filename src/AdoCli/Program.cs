@@ -39,6 +39,10 @@ public static class Program
 
           workitem list             list open work items assigned to you
           workitem show <id>        show a work item
+          workitem create           create a work item (prompts, or --type --title [--description]
+                                    [--assigned-to] [--area] [--iteration] [--tags] [--field Name=value])
+          workitem edit <id>        change fields: --title --description --state --assigned-to
+                                    --area --iteration --tags --comment --field Name=value
 
           build list                list recent builds of the project
           build show <id>           show a build
@@ -138,6 +142,8 @@ public static class Program
             ("pr", "merge") => PrCommands.MergeAsync(ctx),
             ("workitem", "list") => WorkItemCommands.ListAsync(ctx),
             ("workitem", "show") => WorkItemCommands.ShowAsync(ctx),
+            ("workitem", "create") => WorkItemCommands.CreateAsync(ctx),
+            ("workitem", "edit") => WorkItemCommands.EditAsync(ctx),
             ("build", "list") => BuildCommands.ListAsync(ctx),
             ("build", "show") => BuildCommands.ShowAsync(ctx),
             ("build", "run") => BuildCommands.RunAsync(ctx),

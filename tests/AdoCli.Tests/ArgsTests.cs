@@ -23,4 +23,14 @@ public class ArgsTests
         var e = Assert.Throws<AdoException>(() => Args.Parse(["pr", "list", "--status"]));
         Assert.Equal(AdoException.InvalidUsage, e.ExitCode);
     }
+
+    [Fact]
+    public void RepeatedOptionKeepsEveryValue()
+    {
+        var a = Args.Parse(["workitem", "edit", "1", "--field", "A=1", "--field=B=2"]);
+
+        Assert.Equal(["A=1", "B=2"], a.GetAll("--field"));
+        Assert.Equal("B=2", a.Get("--field"));
+        Assert.Empty(a.GetAll("--title"));
+    }
 }

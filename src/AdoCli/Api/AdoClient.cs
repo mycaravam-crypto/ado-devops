@@ -142,12 +142,14 @@ public sealed class AdoClient
             + (project is null ? "" : " AND [System.TeamProject] = @project")
             + " ORDER BY [System.ChangedDate] DESC";
         var result = await SendAsync<WiqlResult>(HttpMethod.Post, Url(project, "wit/wiql", limit is { } top ? $"$top={top}" : ""), new { query = wiql });
-        return await GetWorkItemsAsync(result.WorkItems.Select(w => w.Id), ListFields);
+        return await GetWorkItemsAsync(result.WorkItems.Select(w => w.Id), [.. SummaryFields, .. ListFields]);
     }
 
-    /// <summary>Fields <see cref="GetMyWorkItemsAsync"/> returns: what <c>workitem list</c> shows.</summary>
-    public static readonly string[] ListFields =
-        ["System.Title", "System.WorkItemType", "System.State", "Microsoft.VSTS.Common.Priority", "System.IterationPath", "System.ChangedDate"];
+    // Enough to name a work item: what callers get unless they ask for more.
+    static readonly string[] SummaryFields = ["System.Title", "System.WorkItemType", "System.State"];
+
+    // What `workitem list` shows besides the summary fields.
+    static readonly string[] ListFields = ["Microsoft.VSTS.Common.Priority", "System.IterationPath", "System.ChangedDate"];
 
     // WIQL string literals are single-quoted; a quote inside one is doubled.
     static string WiqlList(IEnumerable<string> values) =>
@@ -159,7 +161,7 @@ public sealed class AdoClient
     /// </summary>
     public async Task<List<WorkItem>> GetWorkItemsAsync(IEnumerable<int> ids, IEnumerable<string>? fields = null)
     {
-        var fieldList = string.Join(',', fields ?? ["System.Title", "System.WorkItemType", "System.State"]);
+        var fieldList = string.Join(',', fields ?? SummaryFields);
         // The server accepts at most 200 ids per request.
         var all = new List<WorkItem>();
         foreach (var chunk in ids.Chunk(200))

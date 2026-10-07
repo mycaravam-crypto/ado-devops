@@ -31,7 +31,10 @@ public static partial class WorkItemCommands
 
     /// <summary>Every value of a repeatable option, also split at commas: --type Bug,Task --type "User Story".</summary>
     public static List<string> Values(Args a, string option) =>
-        a.GetAll(option).SelectMany(v => (v ?? "").Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        a.GetAll(option)
+            .SelectMany(v => (v ?? "").Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
     public static async Task<int> ShowAsync(Context ctx)
     {

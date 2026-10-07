@@ -144,4 +144,61 @@ public class WorkItemTests
         var e = Assert.Throws<AdoException>(() => WorkItemCommands.Fields(Args.Parse(["workitem", "edit", "1", "--field", field])));
         Assert.Equal(AdoException.InvalidUsage, e.ExitCode);
     }
+
+    static Context Ctx(StubHandler stub, params string[] argv) =>
+        new(Args.Parse(argv), new Config(), new AdoClient("https://tfs", "pat", handler: stub));
+
+    [Fact]
+    public async Task CreateCommandSendsTitleDescriptionAndFields()
+    {
+        var stub = new StubHandler(HttpStatusCode.OK, """{"id":4712,"fields":{"System.Title":"Crash","System.WorkItemType":"Bug"}}""");
+
+        var code = await WorkItemCommands.CreateAsync(Ctx(stub, "workitem", "create", "--project", "Platform", "--type", "Bug",
+            "--title", "Crash", "--description", "a < b\nnext", "--field", "Microsoft.VSTS.Common.Priority=1"));
+
+        Assert.Equal(0, code);
+        var request = stub.Requests.Single();
+        Assert.Equal("https://tfs/Platform/_apis/wit/workitems/$Bug?api-version=5.0", request.Url);
+        var patch = JsonNode.Parse(request.Body!)!.AsArray().ToDictionary(op => (string)op!["path"]!, op => (string)op!["value"]!);
+        Assert.Equal("Crash", patch["/fields/System.Title"]);
+        Assert.Equal("a &lt; b<br>next", patch["/fields/System.Description"]);
+        Assert.Equal("1", patch["/fields/Microsoft.VSTS.Common.Priority"]);
+    }
+
+    [Fact]
+    public async Task CreateCommandRequiresTypeWithTitle()
+    {
+        var stub = new StubHandler(HttpStatusCode.OK);
+
+        var e = await Assert.ThrowsAsync<AdoException>(() =>
+            WorkItemCommands.CreateAsync(Ctx(stub, "workitem", "create", "--project", "Platform", "--title", "Crash")));
+
+        Assert.Equal(AdoException.InvalidUsage, e.ExitCode);
+        Assert.Empty(stub.Requests);
+    }
+
+    [Fact]
+    public async Task EditCommandPatchesOnlyGivenFields()
+    {
+        var stub = new StubHandler(HttpStatusCode.OK, """{"id":4711,"fields":{"System.Title":"Improve","System.State":"Active"}}""");
+
+        var code = await WorkItemCommands.EditAsync(Ctx(stub, "workitem", "edit", "4711", "--state", "Active"));
+
+        Assert.Equal(0, code);
+        var request = stub.Requests.Single();
+        Assert.Equal("https://tfs/_apis/wit/workitems/4711?api-version=5.0", request.Url);
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse("""[{"op":"add","path":"/fields/System.State","value":"Active"}]"""),
+            JsonNode.Parse(request.Body!)), request.Body);
+    }
+
+    [Fact]
+    public async Task EditCommandWithoutChangesIsUsageError()
+    {
+        var stub = new StubHandler(HttpStatusCode.OK);
+
+        var e = await Assert.ThrowsAsync<AdoException>(() => WorkItemCommands.EditAsync(Ctx(stub, "workitem", "edit", "4711")));
+
+        Assert.Equal(AdoException.InvalidUsage, e.ExitCode);
+        Assert.Empty(stub.Requests);
+    }
 }

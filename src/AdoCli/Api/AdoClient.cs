@@ -200,7 +200,7 @@ public sealed class AdoClient
         return (page, next);
     }
 
-    /// <summary>Sends one request and deserializes the JSON answer; HTTP errors and rejected credentials become an <see cref="AdoException"/> with a matching exit code.</summary>
+    /// <summary>Sends one request and deserializes the JSON answer; HTTP errors and rejected credentials become an <see cref="AdoException"/> with a matching exit code. <paramref name="onResponse"/> sees the successful response first, e.g. to read paging headers.</summary>
     public async Task<T> SendAsync<T>(HttpMethod method, string url, object? body = null, Action<HttpResponseMessage>? onResponse = null)
     {
         using var request = new HttpRequestMessage(method, url);

@@ -134,7 +134,7 @@ public class PullRequestTests
         var changes = await new AdoClient("https://tfs", "pat", handler: stub).GetPullRequestChangesAsync(pr);
 
         Assert.Equal("https://tfs/Platform/_apis/git/repositories/22222222-2222-2222-2222-222222222222/diffs/commits" +
-            "?baseVersion=def&baseVersionType=commit&targetVersion=abc&targetVersionType=commit&$top=2000&api-version=5.0", stub.Requests[0].Url);
+            "?baseVersion=def&baseVersionType=commit&targetVersion=abc&targetVersionType=commit&$top=2000&$skip=0&api-version=5.0", stub.Requests[0].Url);
         Assert.Equal([new Change("/a.cs", "rename", "/old.cs"), new Change("/src/b.cs", "edit", null)], changes);
     }
 

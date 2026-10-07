@@ -211,6 +211,7 @@ then the default.
 | `apiVersion` | `ADO_API_VERSION` | | `5.0` |
 | `insecure` | `ADO_INSECURE` | `--insecure` | `false` |
 | `caCert` | `ADO_CA_CERT` | `--ca-cert` | none |
+| `proxy` | `ADO_PROXY` | `--proxy` | the system proxy |
 
 Inside a clone, the `origin` remote's project wins over `ADO_PROJECT` and the file.
 
@@ -231,6 +232,7 @@ project     Platform                                 git remote
 apiVersion  5.0                                      default
 insecure    false                                    ADO_INSECURE
 caCert      /home/me/company-ca.pem                  config file
+proxy       http://svc-ado:****@proxy.company:8080   config file
 ```
 
 `config set` checks the value before saving it: the server must be an http(s) URL, `insecure` must be a boolean, and
@@ -276,6 +278,34 @@ The same setting is passed to git (`http.sslCAInfo` or `http.sslVerify=false`) f
 `pr diff`. `repo clone` also writes it into the new clone's git config, so a later `git pull` works too. For git the
 CA file replaces the system certificates rather than adding to them. If the server's certificate is rejected, `ado`
 says so, names both options and exits with 1.
+
+### Proxy
+
+Without a `proxy` setting, `ado` uses the system proxy: `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY` on Linux, and
+the OS proxy settings on Windows and macOS. Set `proxy` to use a specific one, or `none` to connect directly:
+
+```bash
+ado config set proxy http://proxy.company.local:8080
+ado config set proxy http://user:password@proxy.company.local:8080   # proxy with Basic authentication
+ado config set proxy socks5://jumphost:1080
+ado config set proxy none                                            # direct, ignore HTTPS_PROXY
+ado pr list --proxy none                                             # just this once
+export ADO_PROXY=http://proxy.company.local:8080                     # for this shell
+```
+
+Supported schemes are `http`, `https`, `socks4`, `socks4a` and `socks5`. Without credentials in the URL, a proxy
+that asks for NTLM or Kerberos gets your signed-in Windows/domain credentials, as a browser would. Special characters
+in the password must be URL-encoded (`@` is `%40`). The password is never printed: `config list`, `auth status` and
+error messages show it as `****`. The config file holding it is readable only by you. A proxy that rejects the
+credentials gives a clear error (exit code 1). `ado auth status` shows the proxy in effect:
+
+```
+Proxy: http://proxy.company.local:8080 (from ADO_PROXY)
+```
+
+`ado auth login <url> --proxy <url>` saves the proxy along with the login. git uses the same proxy for `repo clone`,
+`pr checkout` and `pr diff` (as `remote.origin.proxy`, so other remotes are not affected). `repo clone` stores it in the
+new clone without the password; git then asks for the password, or gets it from your credential helper.
 
 ### Supported servers
 

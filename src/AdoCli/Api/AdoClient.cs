@@ -174,6 +174,7 @@ public sealed class AdoClient
             401 => AuthFailed(),
             403 => new($"permission denied{detail}", AdoException.Permission),
             404 => new($"not found{detail}", AdoException.NotFound),
+            407 => new(Proxy.AuthRequired),
             409 => new($"conflict{detail}", AdoException.Conflict),
             429 => new("rate limited by Azure DevOps Server; try again later"),
             >= 500 => new($"Azure DevOps Server error ({code}){detail}"),

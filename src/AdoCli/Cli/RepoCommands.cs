@@ -36,8 +36,11 @@ public static class RepoCommands
     public static async Task<int> CloneAsync(Context ctx)
     {
         var repo = await GetAsync(ctx);
-        // clone -c also writes the TLS options into the new repository's config, so later git pulls work too.
-        string[] args = ["clone", .. ctx.Tls.GitConfig(), repo.RemoteUrl!, .. ctx.Args.At(3) is { } dir ? [dir] : Array.Empty<string>()];
+        // git -c applies the full settings to this clone; clone -c also stores them in the new repository so later
+        // git pulls work too, with the proxy password left out (git asks its credential helper for it instead).
+        var proxy = ctx.ProxyUrl;
+        string[] args = [.. Proxy.GitConfig(proxy), "clone", .. ctx.Tls.GitConfig(), .. Proxy.GitConfig(proxy is null ? null : Proxy.WithoutPassword(proxy)),
+            repo.RemoteUrl!, .. ctx.Args.At(3) is { } dir ? [dir] : Array.Empty<string>()];
         return GitClient.Passthrough(args);
     }
 

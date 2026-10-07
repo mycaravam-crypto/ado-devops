@@ -4,7 +4,7 @@ using AdoCli.Api;
 
 public static class AuthCommands
 {
-    /// <summary>ado auth login: reads the PAT, checks it against the server and only then saves it with --insecure / --ca-cert, keeping the configured project, API version and TLS options.</summary>
+    /// <summary>ado auth login: reads the PAT, checks it against the server and only then saves it with --insecure / --ca-cert / --proxy, keeping the configured project, API version, TLS and proxy options.</summary>
     public static async Task<int> LoginAsync(Context ctx)
     {
         var server = CheckServer(ctx.Args.At(2) ?? throw AdoException.Usage("usage: ado auth login <server-url>"));
@@ -18,7 +18,8 @@ public static class AuthCommands
         // TLS options given at login belong to this server, so they are kept for later commands.
         var insecure = ctx.InsecureFlag ?? old?.Insecure;
         var caCert = ctx.Args.Get("--ca-cert") is { } ca ? ConfigCommands.CheckCaCert(ca) : old?.CaCert;
-        new Config { Server = server, Pat = pat, Project = old?.Project, ApiVersion = old?.ApiVersion, Insecure = insecure, CaCert = caCert }.Save();
+        var proxy = ctx.Args.Get("--proxy") is { } px ? Proxy.Check(px) : old?.Proxy;
+        new Config { Server = server, Pat = pat, Project = old?.Project, ApiVersion = old?.ApiVersion, Insecure = insecure, CaCert = caCert, Proxy = proxy }.Save();
         Console.WriteLine($"Logged in to {server} as {user.AuthenticatedUser.ProviderDisplayName}");
         if (insecure == true)
             Console.WriteLine("TLS certificate verification stays disabled for this server; 'ado config unset insecure' turns it back on.");
@@ -38,6 +39,7 @@ public static class AuthCommands
         var source = Environment.GetEnvironmentVariable("ADO_PAT") is { Length: > 0 } ? " (token from ADO_PAT)" : "";
         Console.WriteLine($"Logged in to {ctx.Config.Server} as {user.AuthenticatedUser.ProviderDisplayName}{source}");
         Console.WriteLine($"TLS: {DescribeTls(ctx)}");
+        Console.WriteLine($"Proxy: {DescribeProxy(ctx)}");
         return 0;
     }
 
@@ -51,6 +53,15 @@ public static class AuthCommands
         return tls.CaCert is not null
             ? $"system certificate store + CA file {tls.CaCert} (caCert, from {ca.Source})"
             : "system certificate store" + (ca.Value is null ? "" : $" (caCert switched off by {ca.Source})");
+    }
+
+    /// <summary>One line saying which proxy is used and which setting decided it; the password is masked.</summary>
+    public static string DescribeProxy(Context ctx)
+    {
+        var proxy = ctx.Setting("proxy");
+        return proxy.Value is null ? "system default (HTTPS_PROXY / HTTP_PROXY / NO_PROXY or OS settings)"
+            : Proxy.IsNone(proxy.Value) ? $"none, direct connection (from {proxy.Source})"
+            : $"{proxy.Value} (from {proxy.Source})";
     }
 
     /// <summary>An absolute http(s) URL without credentials, trailing slash removed; warns about plain HTTP.</summary>

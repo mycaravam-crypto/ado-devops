@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 using AdoCli.Api;
 using AdoCli.Cli;
 
-/// <summary>~/.ado/config.json, overridden by ADO_SERVER / ADO_PAT / ADO_PROJECT / ADO_API_VERSION / ADO_INSECURE / ADO_CA_CERT.</summary>
+/// <summary>~/.ado/config.json, overridden by ADO_SERVER / ADO_PAT / ADO_PROJECT / ADO_API_VERSION / ADO_INSECURE / ADO_CA_CERT / ADO_PROXY.</summary>
 public sealed class Config
 {
     public string? Server { get; init; }
@@ -16,13 +16,15 @@ public sealed class Config
     public bool? Insecure { get; init; }
     /// <summary>PEM file with the CA certificate(s) the server's certificate is issued by, trusted in addition to the system's.</summary>
     public string? CaCert { get; init; }
+    /// <summary>Proxy URL (credentials allowed), "none" for a direct connection; unset uses the system proxy.</summary>
+    public string? Proxy { get; init; }
 
     /// <summary>Where each loaded value came from: the environment variable's name, or "config file".</summary>
     [JsonIgnore]
     public IReadOnlyDictionary<string, string> Sources { get; init; } = new Dictionary<string, string>();
 
     /// <summary>The keys of the config file, as <c>ado config</c> names them.</summary>
-    public static readonly string[] Keys = ["server", "pat", "project", "apiVersion", "insecure", "caCert"];
+    public static readonly string[] Keys = ["server", "pat", "project", "apiVersion", "insecure", "caCert", "proxy"];
 
     public static string DefaultPath { get; } =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".ado", "config.json");
@@ -50,6 +52,7 @@ public sealed class Config
             ApiVersion = Pick("apiVersion", "ADO_API_VERSION", file?.ApiVersion),
             Insecure = insecure is null ? null : ParseBool("ADO_INSECURE", insecure),
             CaCert = Pick("caCert", "ADO_CA_CERT", file?.CaCert),
+            Proxy = Pick("proxy", "ADO_PROXY", file?.Proxy),
             Sources = sources,
         };
     }

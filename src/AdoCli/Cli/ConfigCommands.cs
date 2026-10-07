@@ -32,7 +32,8 @@ public static class ConfigCommands
     {
         var key = Key(ctx, "config set <key> <value>");
         var value = ctx.Args.At(3) ?? throw AdoException.Usage("usage: ado config set <key> <value>");
-        return Write(Apply(Config.ReadFile(Config.DefaultPath) ?? new Config(), key, value), key, $"Set {key} = {value}");
+        var shown = key == "proxy" ? Proxy.Mask(value) : value;
+        return Write(Apply(Config.ReadFile(Config.DefaultPath) ?? new Config(), key, value), key, $"Set {key} = {shown}");
     }
 
     /// <summary>ado config unset &lt;key&gt;: removes the setting from the config file, so its default applies again.</summary>
@@ -57,6 +58,7 @@ public static class ConfigCommands
             ApiVersion = key == "apiVersion" ? value : file.ApiVersion,
             Insecure = key == "insecure" ? (value is null ? null : Config.ParseBool("insecure", value)) : file.Insecure,
             CaCert = key == "caCert" ? (value is null ? null : CheckCaCert(value)) : file.CaCert,
+            Proxy = key == "proxy" ? (value is null ? null : Proxy.Check(value)) : file.Proxy,
         };
     }
 

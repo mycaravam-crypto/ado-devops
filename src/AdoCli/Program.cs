@@ -21,7 +21,7 @@ public static class Program
           config get <key>          print one setting (exit 1 if not set)
           config set <key> <value>  save a setting in ~/.ado/config.json
           config unset <key>        remove a setting from ~/.ado/config.json
-                                    keys: server, project, apiVersion, insecure, caCert
+                                    keys: server, project, apiVersion, insecure, caCert, proxy
 
           repo list                 list repositories (of the current project, if known)
           repo show [<repo>]        show repository details
@@ -58,6 +58,8 @@ public static class Program
                             --insecure=false overrides a saved setting
           --ca-cert <file>  also trust the CA certificate(s) in this PEM file;
                             --ca-cert none overrides a saved one
+          --proxy <url>     use this HTTP(S) or SOCKS proxy; --proxy none connects
+                            directly (default: HTTPS_PROXY or system settings)
           --help            show this help
           --version         show version
         """;
@@ -75,6 +77,16 @@ public static class Program
         catch (HttpRequestException e) when (!debug && Tls.IsUntrusted(e))
         {
             Console.Error.WriteLine($"Error: {Tls.UntrustedHint}");
+            return AdoException.General;
+        }
+        catch (HttpRequestException e) when (!debug && e.StatusCode == System.Net.HttpStatusCode.ProxyAuthenticationRequired)
+        {
+            Console.Error.WriteLine($"Error: {Proxy.AuthRequired}");
+            return AdoException.General;
+        }
+        catch (HttpRequestException e) when (!debug && e.HttpRequestError == HttpRequestError.ProxyTunnelError)
+        {
+            Console.Error.WriteLine($"Error: could not connect through the proxy: {e.Message}\n\nCheck the proxy with 'ado config get proxy'; 'ado config set proxy none' connects directly.");
             return AdoException.General;
         }
         catch (HttpRequestException e) when (!debug)

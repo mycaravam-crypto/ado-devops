@@ -54,6 +54,7 @@ public sealed class Config
         };
     }
 
+    /// <summary>The config file alone, without environment overrides; null when it does not exist.</summary>
     public static Config? ReadFile(string path)
     {
         if (!File.Exists(path))

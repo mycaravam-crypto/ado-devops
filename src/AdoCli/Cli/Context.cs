@@ -58,6 +58,7 @@ public sealed class Context(Args args, Config? config = null)
     /// <summary>Every setting in <see cref="Config.Keys"/> order, with the same precedence the commands use.</summary>
     public IReadOnlyList<Setting> Settings() => Config.Keys.Select(Setting).ToList();
 
+    /// <summary>One setting in effect and its source: flag, then ADO_* / config file, then default. The git remote comes before ADO_PROJECT for project and is the fallback for server.</summary>
     public Setting Setting(string key) => key switch
     {
         "server" => Config.Server is { } s ? FromConfig(key, s) : Remote?.Server is { } r ? new(key, r, "git remote") : new(key, null, "not set"),

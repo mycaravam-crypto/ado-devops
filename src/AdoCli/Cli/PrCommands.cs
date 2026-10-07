@@ -13,12 +13,19 @@ public static class PrCommands
         if (ctx.Json)
             return Output.WriteJson(prs);
 
-        Output.Table(["ID", "TITLE", "AUTHOR", "STATUS"], prs.Select(p => new[]
-        {
-            p.PullRequestId.ToString(), Output.Truncate(p.Title, 50), p.CreatedBy.DisplayName, Output.Status(p.Status),
-        }));
+        Output.Table(["ID", "TITLE", "AUTHOR", "TARGET", "STATUS"], prs.Select(ListRow));
         return 0;
     }
+
+    /// <summary>One row of <c>pr list</c>; status stays last so its color codes never skew the padding.</summary>
+    public static string[] ListRow(PullRequest p) =>
+    [
+        p.PullRequestId.ToString(),
+        Output.Truncate(p.Title, 50),
+        p.CreatedBy.DisplayName,
+        Output.Branch(p.TargetRefName),
+        Output.Status(p.Status),
+    ];
 
     /// <summary>ado pr show &lt;id&gt;: PR details with changed file count, description and reviewer votes.</summary>
     public static async Task<int> ShowAsync(Context ctx)

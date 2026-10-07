@@ -313,10 +313,10 @@ ado pr list --status active
 Default output:
 
 ```text
-ID     TITLE                         AUTHOR       STATUS
-142    Fix import validation        hannovb      Active
-139    Improve error handling       max          Active
-131    Update documentation         anna         Completed
+ID     TITLE                         AUTHOR       TARGET    STATUS
+142    Fix import validation        hannovb      main      Active
+139    Improve error handling       max          develop   Active
+131    Update documentation         anna         main      Completed
 ```
 
 Keep filtering minimal.

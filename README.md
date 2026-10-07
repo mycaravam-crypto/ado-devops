@@ -108,9 +108,13 @@ Create a personal access token (PAT) in Azure DevOps Server (scopes: Code read &
 
 ```bash
 ado auth login https://tfs.company.local/tfs/DefaultCollection   # prompts for the PAT
-ado auth status
-ado auth logout
+ado auth status               # server, user, TLS mode and proxy in effect
+ado auth logout               # deletes ~/.ado/config.json
 ```
+
+`auth login` checks the token against the server before saving it, and keeps the project, API version, TLS and proxy
+settings already in the config file. A server URL with embedded credentials is rejected; a plain `http://` URL works
+but prints a warning, since the token then travels unencrypted.
 
 In CI, pipe the token in: `echo "$PAT" | ado auth login <server-url>`, or skip login and set environment variables (below).
 
@@ -123,11 +127,15 @@ ado repo clone <repo> [dir]
 ado repo status               # server/project/repo of the current clone (no network call)
 ```
 
+`repo status` warns when the clone's server is not the one you are logged in to. `repo clone` passes the TLS and proxy
+settings on to git (see [Configuration](#configuration)).
+
 ## Pull requests
 
 ```bash
 ado pr list [--mine] [--status active|completed|abandoned|all]
-ado pr show 142
+ado pr show 142               # details, changed file count, description, reviewer votes
+ado pr context 142            # PR, commits, changed files and linked work items as one JSON document
 ado pr checkout 142           # local branch pr/142; refuses to run on a dirty tree
 ado pr diff 142               # git diff target...source
 ado pr approve 142
@@ -135,19 +143,31 @@ ado pr merge 142 [--squash] [--yes]
 ado pr create                 # prompts; or --title t [--description d] [--source b] [--target b]
 ```
 
+- `pr list` shows up to 50 pull requests of the current repository, or of the whole project outside a clone. Without
+  `--status` it lists active ones.
+- `pr checkout` and `pr diff` run git and must be run inside a clone of the PR's repository. If `pr/<id>` already
+  exists, `pr checkout` only fast-forwards it, so local commits on it are never lost. `pr diff --json` lists the
+  changed files from the server and works anywhere.
+- `pr create` uses the current branch as source and the repository's default branch as target unless told otherwise.
+  When stdin is not a terminal, `--title` is required.
+- `pr merge` shows the PR and asks for confirmation (`--yes` / `-y` skips it). If branch policies still have to pass,
+  the server only queues the completion, and `ado` says so.
+
 ## Work items
 
 ```bash
-ado workitem list             # open items assigned to you
-ado workitem show 4711
+ado workitem list             # open items assigned to you (current project, if known), up to 50
+ado workitem show 4711        # title, type, state, assignee, then every other field the server returns
 ```
+
+Read-only: `ado` does not create or edit work items.
 
 ## Builds
 
 ```bash
-ado build list
+ado build list                # the 20 most recently queued builds of the project
 ado build show 815
-ado build run <definition-id> [--branch b]
+ado build run <definition-id> [--branch b]   # default: the definition's default branch
 ```
 
 ## JSON
@@ -159,7 +179,10 @@ either JSON or empty (`auth` commands print plain text only). `ado pr context <i
 ado pr list --json | jq '.[].pullRequestId'
 ```
 
-`--debug` logs each HTTP request to stderr (method, URL, status, timing; never credentials).
+`--debug` logs each HTTP request to stderr (method, URL, status, timing; never credentials) and shows stack traces
+on errors.
+
+Status values are colored only when stdout is a terminal and `NO_COLOR` is not set.
 
 ## Exit codes
 
@@ -330,9 +353,22 @@ dotnet test
 dotnet run --project src/AdoCli -- --help
 ```
 
-The code is deliberately flat: commands in `src/AdoCli/Cli` call `Api/AdoClient` (one `HttpClient`) and `Git/GitClient`
-(runs `git`) directly. The REST API version (default `5.0`) is added to every URL in one place, `AdoClient.Url`.
-Tests use a stub HTTP handler; no real server is needed. See [PLAN.md](PLAN.md) for scope and non-goals.
+The code is deliberately flat and has no dependencies beyond .NET (tests use xUnit):
+
+| Path | Contents |
+|---|---|
+| `src/AdoCli/Program.cs` | help text, command dispatch, error → exit code mapping |
+| `src/AdoCli/Args.cs`, `Config.cs` | argument parser; `~/.ado/config.json` plus `ADO_*` overrides |
+| `src/AdoCli/Cli/` | one file per command group; `Context` resolves settings, git remote and the client |
+| `src/AdoCli/Api/AdoClient.cs` | the one REST client (one `HttpClient`); every URL is built in `AdoClient.Url`, which adds the API version |
+| `src/AdoCli/Api/Tls.cs`, `Proxy.cs` | CA file / insecure mode and proxy, for both `HttpClient` and git |
+| `src/AdoCli/Git/GitClient.cs` | runs `git`; detects server, project and repository from `origin` |
+| `tests/AdoCli.Tests/` | unit tests with a stub HTTP handler; no real server is needed |
+
+Commands call `AdoClient` and `GitClient` directly. Every pull request runs two GitHub workflows:
+`test` (`dotnet build` and `dotnet test`, also on `main`) and `docwizz`, which checks documentation coverage and the
+layering in [docwizz.yaml](docwizz.yaml) (`Cli` may use `Api` and `Git`, never the other way round) for problems the
+change introduces. See [PLAN.md](PLAN.md) for scope and non-goals.
 
 ### Versions and releases
 

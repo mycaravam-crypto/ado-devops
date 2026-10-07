@@ -200,8 +200,32 @@ Commands that change state (`pr create`, `pr approve`, `pr merge`, `build run`) 
 { "server": "https://tfs.company.local/tfs/DefaultCollection", "pat": "...", "project": "Platform" }
 ```
 
-`project` and `apiVersion` are optional and set by hand. Environment variables override the file:
-`ADO_SERVER`, `ADO_PAT`, `ADO_PROJECT`, `ADO_API_VERSION`.
+`project`, `apiVersion`, `insecure` and `caCert` are optional. Environment variables override the file:
+`ADO_SERVER`, `ADO_PAT`, `ADO_PROJECT`, `ADO_API_VERSION`, `ADO_INSECURE`, `ADO_CA_CERT`.
+
+### TLS certificates
+
+By default the server's certificate must be trusted by the operating system. For internal servers there are two options:
+
+| Option | Flag | Environment | Config file |
+|---|---|---|---|
+| Also trust a company CA (PEM file, may hold several certificates) | `--ca-cert <file>` | `ADO_CA_CERT=<file>` | `"caCert": "/path/ca.pem"` |
+| Skip certificate checks entirely | `--insecure` | `ADO_INSECURE=1` | `"insecure": true` |
+
+Prefer `--ca-cert`: it still checks the host name and protects the token. `--insecure` accepts any certificate, so only use
+it on a network you trust; `ado` prints a warning on every run while it is on. A flag wins over the environment, which
+wins over the file.
+
+Given to `ado auth login`, either option is saved in the config file for later commands:
+
+```bash
+ado auth login https://tfs.company.local/tfs/DefaultCollection --ca-cert ~/company-ca.pem
+ado auth login https://tfs.company.local/tfs/DefaultCollection --insecure
+```
+
+The same setting is passed to git (`http.sslCAInfo` or `http.sslVerify=false`) for `repo clone`, `pr checkout` and
+`pr diff`. `repo clone` also writes it into the new clone's git config, so a later `git pull` works as well.
+If the certificate is rejected, `ado` says so and exits with 1.
 
 ### Supported servers
 

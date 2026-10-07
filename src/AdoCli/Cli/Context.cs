@@ -35,7 +35,19 @@ public sealed class Context(Args args)
     public int Id(string usage) =>
         int.TryParse(args.At(2), out var id) ? id : throw AdoException.Usage($"usage: ado {usage}");
 
+    /// <summary>--insecure / --ca-cert, else ADO_INSECURE / ADO_CA_CERT / config.</summary>
+    public Tls Tls => new(args.Has("--insecure") || Config.Insecure == true, args.Get("--ca-cert") ?? Config.CaCert);
+
+    /// <summary>The handler for every <see cref="AdoClient"/>; warns once when certificate checks are off.</summary>
+    public HttpMessageHandler CreateHandler()
+    {
+        var tls = Tls;
+        if (tls.Insecure)
+            Console.Error.WriteLine("Warning: TLS certificate verification is disabled (--insecure / ADO_INSECURE / \"insecure\" in config).");
+        return tls.CreateHandler();
+    }
+
     public AdoClient Client => _client ??= Server is { } server && Config.Pat is { } pat
-        ? new AdoClient(server, pat, args.Has("--debug"), apiVersion: Config.ApiVersion ?? AdoClient.DefaultApiVersion)
+        ? new AdoClient(server, pat, args.Has("--debug"), CreateHandler(), Config.ApiVersion ?? AdoClient.DefaultApiVersion)
         : throw new AdoException("not logged in.\n\nRun:\n  ado auth login <server-url>", AdoException.Auth);
 }

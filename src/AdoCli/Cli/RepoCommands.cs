@@ -36,7 +36,8 @@ public static class RepoCommands
     public static async Task<int> CloneAsync(Context ctx)
     {
         var repo = await GetAsync(ctx);
-        string[] args = ctx.Args.At(3) is { } dir ? ["clone", repo.RemoteUrl!, dir] : ["clone", repo.RemoteUrl!];
+        // clone -c also writes the TLS options into the new repository's config, so later git pulls work too.
+        string[] args = ["clone", .. ctx.Tls.GitConfig(), repo.RemoteUrl!, .. ctx.Args.At(3) is { } dir ? [dir] : Array.Empty<string>()];
         return GitClient.Passthrough(args);
     }
 

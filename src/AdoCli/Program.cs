@@ -43,10 +43,12 @@ public static class Program
         or set a default project with ADO_PROJECT.
 
         Global flags:
-          --json      machine-readable output
-          --debug     log HTTP requests and show stack traces
-          --help      show this help
-          --version   show version
+          --json            machine-readable output
+          --debug           log HTTP requests and show stack traces
+          --insecure        skip TLS certificate checks (internal servers only)
+          --ca-cert <file>  also trust the CA certificate(s) in this PEM file
+          --help            show this help
+          --version         show version
         """;
 
     public static string Version { get; } = Assembly.GetExecutingAssembly().GetName().Version!.ToString(3);
@@ -58,6 +60,11 @@ public static class Program
         try
         {
             return await RunAsync(Args.Parse(argv));
+        }
+        catch (HttpRequestException e) when (!debug && Tls.IsUntrusted(e))
+        {
+            Console.Error.WriteLine($"Error: {Tls.UntrustedHint}");
+            return AdoException.General;
         }
         catch (HttpRequestException e) when (!debug)
         {

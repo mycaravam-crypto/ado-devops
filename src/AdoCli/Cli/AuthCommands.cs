@@ -4,7 +4,7 @@ using AdoCli.Api;
 
 public static class AuthCommands
 {
-    /// <summary>ado auth login: reads the PAT, checks it against the server and only then saves it, keeping the configured project and API version.</summary>
+    /// <summary>ado auth login: reads the PAT, checks it against the server and only then saves it with --insecure / --ca-cert, keeping the configured project, API version and TLS options.</summary>
     public static async Task<int> LoginAsync(Context ctx)
     {
         var server = ctx.Args.At(2) ?? throw AdoException.Usage("usage: ado auth login <server-url>");
@@ -20,10 +20,15 @@ public static class AuthCommands
             throw AdoException.Usage("no token given");
 
         server = server.TrimEnd('/');
-        var user = await new AdoClient(server, pat, ctx.Args.Has("--debug")).GetConnectionDataAsync();
+        var user = await new AdoClient(server, pat, ctx.Args.Has("--debug"), ctx.CreateHandler()).GetConnectionDataAsync();
         var old = Config.ReadFile(Config.DefaultPath);
-        new Config { Server = server, Pat = pat, Project = old?.Project, ApiVersion = old?.ApiVersion }.Save();
+        // TLS options given at login belong to this server, so they are kept for later commands.
+        var insecure = ctx.Args.Has("--insecure") ? true : old?.Insecure;
+        var caCert = ctx.Args.Get("--ca-cert") is { } ca ? Path.GetFullPath(ca) : old?.CaCert;
+        new Config { Server = server, Pat = pat, Project = old?.Project, ApiVersion = old?.ApiVersion, Insecure = insecure, CaCert = caCert }.Save();
         Console.WriteLine($"Logged in to {server} as {user.AuthenticatedUser.ProviderDisplayName}");
+        if (ctx.Args.Has("--insecure"))
+            Console.WriteLine("TLS certificate verification stays disabled for this server; remove \"insecure\" from ~/.ado/config.json to turn it back on.");
         return 0;
     }
 

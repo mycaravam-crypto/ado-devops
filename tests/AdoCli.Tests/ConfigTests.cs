@@ -30,6 +30,32 @@ public class ConfigTests
     }
 
     [Fact]
+    public void LoadsTlsOptionsWithEnvironmentOverrides()
+    {
+        var path = Path.GetTempFileName();
+        File.WriteAllText(path, """{"insecure":true,"caCert":"/etc/ado/ca.pem"}""");
+        try
+        {
+            Assert.True(Config.Load(path).Insecure);
+            Assert.Equal("/etc/ado/ca.pem", Config.Load(path).CaCert);
+
+            Environment.SetEnvironmentVariable("ADO_INSECURE", "0");
+            Environment.SetEnvironmentVariable("ADO_CA_CERT", "/tmp/other.pem");
+            Assert.False(Config.Load(path).Insecure);
+            Assert.Equal("/tmp/other.pem", Config.Load(path).CaCert);
+
+            Environment.SetEnvironmentVariable("ADO_INSECURE", "maybe");
+            Assert.Equal(AdoException.InvalidUsage, Assert.Throws<AdoException>(() => Config.Load(path)).ExitCode);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("ADO_INSECURE", null);
+            Environment.SetEnvironmentVariable("ADO_CA_CERT", null);
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void InvalidFileGivesCleanError()
     {
         var path = Path.GetTempFileName();

@@ -17,6 +17,12 @@ public static class Program
           auth status               show login state
           auth logout               remove stored credentials
 
+          config list               show every setting, its value and where it comes from
+          config get <key>          print one setting (exit 1 if not set)
+          config set <key> <value>  save a setting in ~/.ado/config.json
+          config unset <key>        remove a setting from ~/.ado/config.json
+                                    keys: server, project, apiVersion, insecure, caCert
+
           repo list                 list repositories (of the current project, if known)
           repo show [<repo>]        show repository details
           repo clone <repo> [dir]   clone a repository with git
@@ -42,11 +48,18 @@ public static class Program
         from the origin remote. Otherwise pass --project <name> and --repo <name>,
         or set a default project with ADO_PROJECT.
 
+        Settings are taken from flags, then ADO_* environment variables, then
+        ~/.ado/config.json. 'ado config list' shows which one applies.
+
         Global flags:
-          --json      machine-readable output
-          --debug     log HTTP requests and show stack traces
-          --help      show this help
-          --version   show version
+          --json            machine-readable output
+          --debug           log HTTP requests and show stack traces
+          --insecure        skip TLS certificate checks (internal servers only);
+                            --insecure=false overrides a saved setting
+          --ca-cert <file>  also trust the CA certificate(s) in this PEM file;
+                            --ca-cert none overrides a saved one
+          --help            show this help
+          --version         show version
         """;
 
     public static string Version { get; } = Assembly.GetExecutingAssembly().GetName().Version!.ToString(3);
@@ -58,6 +71,11 @@ public static class Program
         try
         {
             return await RunAsync(Args.Parse(argv));
+        }
+        catch (HttpRequestException e) when (!debug && Tls.IsUntrusted(e))
+        {
+            Console.Error.WriteLine($"Error: {Tls.UntrustedHint}");
+            return AdoException.General;
         }
         catch (HttpRequestException e) when (!debug)
         {
@@ -90,6 +108,10 @@ public static class Program
             ("auth", "login") => AuthCommands.LoginAsync(ctx),
             ("auth", "status") => AuthCommands.StatusAsync(ctx),
             ("auth", "logout") => AuthCommands.LogoutAsync(ctx),
+            ("config", "list") => ConfigCommands.ListAsync(ctx),
+            ("config", "get") => ConfigCommands.GetAsync(ctx),
+            ("config", "set") => ConfigCommands.SetAsync(ctx),
+            ("config", "unset") => ConfigCommands.UnsetAsync(ctx),
             ("repo", "list") => RepoCommands.ListAsync(ctx),
             ("repo", "show") => RepoCommands.ShowAsync(ctx),
             ("repo", "clone") => RepoCommands.CloneAsync(ctx),

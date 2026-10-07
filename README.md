@@ -200,8 +200,82 @@ Commands that change state (`pr create`, `pr approve`, `pr merge`, `build run`) 
 { "server": "https://tfs.company.local/tfs/DefaultCollection", "pat": "...", "project": "Platform" }
 ```
 
-`project` and `apiVersion` are optional and set by hand. Environment variables override the file:
-`ADO_SERVER`, `ADO_PAT`, `ADO_PROJECT`, `ADO_API_VERSION`.
+Each setting is taken from the first of these that has it: a command-line flag, an environment variable, the config file,
+then the default.
+
+| Key | Environment | Flag | Default |
+|---|---|---|---|
+| `server` | `ADO_SERVER` | | the `origin` remote's server |
+| `pat` | `ADO_PAT` | | (set by `ado auth login`) |
+| `project` | `ADO_PROJECT` | `--project` | the `origin` remote's project |
+| `apiVersion` | `ADO_API_VERSION` | | `5.0` |
+| `insecure` | `ADO_INSECURE` | `--insecure` | `false` |
+| `caCert` | `ADO_CA_CERT` | `--ca-cert` | none |
+
+Inside a clone, the `origin` remote's project wins over `ADO_PROJECT` and the file.
+
+### Viewing and changing settings
+
+```bash
+ado config list               # every setting, its value and where it comes from (token masked)
+ado config get insecure       # one value; exits with 1 if not set
+ado config set caCert ~/company-ca.pem
+ado config unset insecure     # back to the default
+```
+
+```
+KEY         VALUE                                    SOURCE
+server      https://tfs.company.local/tfs/Default    config file
+pat         ********                                 config file
+project     Platform                                 git remote
+apiVersion  5.0                                      default
+insecure    false                                    ADO_INSECURE
+caCert      /home/me/company-ca.pem                  config file
+```
+
+`config set` checks the value before saving it: the server must be an http(s) URL, `insecure` must be a boolean, and
+the CA file must exist and hold a PEM certificate. Relative paths are saved as absolute paths. If an environment
+variable overrides the key you just set, `ado` says so. The token is only set by `ado auth login`. `--json` works with
+`config list` and `config get`.
+
+### TLS certificates
+
+By default the server's certificate must be trusted by the operating system. For internal servers there are two options:
+
+| Option | Flag | Environment | Config |
+|---|---|---|---|
+| Also trust a company CA (PEM file, may hold several certificates) | `--ca-cert <file>` | `ADO_CA_CERT=<file>` | `caCert` |
+| Skip certificate checks entirely | `--insecure` | `ADO_INSECURE=1` | `insecure` |
+
+Prefer the CA file: `ado` still checks the host name, so the token stays protected. `--insecure` accepts any
+certificate. Use it only on a network you trust. While it is on, `ado` prints a warning that names the setting
+responsible.
+
+Both can be switched off for one command or one shell, whatever is saved:
+
+```bash
+ado pr list --insecure=false             # check certificates this time
+ado pr list --ca-cert none               # ignore the saved CA file this time
+export ADO_INSECURE=0                    # for this shell (accepts 1/0, true/false, yes/no)
+```
+
+`ado auth status` prints the TLS mode in effect and where it comes from:
+
+```
+Logged in to https://tfs.company.local/tfs/DefaultCollection as Jane Doe
+TLS: system certificate store + CA file /home/me/company-ca.pem (caCert, from config file)
+```
+
+Given to `ado auth login`, `--insecure`, `--insecure=false` and `--ca-cert` are saved in the config file:
+
+```bash
+ado auth login https://tfs.company.local/tfs/DefaultCollection --ca-cert ~/company-ca.pem
+```
+
+The same setting is passed to git (`http.sslCAInfo` or `http.sslVerify=false`) for `repo clone`, `pr checkout` and
+`pr diff`. `repo clone` also writes it into the new clone's git config, so a later `git pull` works too. For git the
+CA file replaces the system certificates rather than adding to them. If the server's certificate is rejected, `ado`
+says so, names both options and exits with 1.
 
 ### Supported servers
 
@@ -212,7 +286,7 @@ Commands that change state (`pr create`, `pr approve`, `pr merge`, `build run`) 
 | Azure DevOps Server 2022 | 7.0 |
 
 `ado` sends `api-version=5.0` by default, which all of them accept and every command works with.
-To use a newer one, set `ADO_API_VERSION=6.0` (or `"apiVersion": "6.0"` in the config file). If the server does not
+To use a newer one, run `ado config set apiVersion 6.0` (or set `ADO_API_VERSION=6.0`). If the server does not
 support the version, `ado` says so and exits with 1. TFS 2018 and older are not supported.
 
 Inside a clone of an Azure DevOps repository, project and repository are taken from the `origin` remote,

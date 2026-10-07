@@ -157,7 +157,7 @@ ado pr create                 # prompts; or --title t [--description d] [--sourc
 
 ```bash
 ado workitem list             # open items assigned to you (current project, if known), up to 50
-ado workitem show 4711
+ado workitem show 4711        # title, type, state, assignee, then every other field the server returns
 ```
 
 Read-only: `ado` does not create or edit work items.

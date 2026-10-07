@@ -6,75 +6,6 @@ using AdoCli.Cli;
 
 public static class Program
 {
-    const string Help = """
-        ado - a small CLI for Azure DevOps Server
-
-        Usage:
-          ado <command> <subcommand> [arguments] [flags]
-
-        Commands:
-          auth login <server-url>   log in with a personal access token
-          auth status               show login state
-          auth logout               remove stored credentials
-
-          config list               show every setting, its value and where it comes from
-          config get <key>          print one setting (exit 1 if not set)
-          config set <key> <value>  save a setting in ~/.ado/config.json
-          config unset <key>        remove a setting from ~/.ado/config.json
-                                    keys: server, project, apiVersion, insecure, caCert, proxy
-
-          repo list                 list repositories (of the current project, if known)
-          repo show [<repo>]        show repository details
-          repo clone <repo> [dir]   clone a repository with git
-          repo status               show the Azure DevOps repository of the current directory
-
-          pr list                   list pull requests of the project/repository [--mine] [--status active|completed|abandoned|all] [--limit <n>]
-          pr show <id>              show a pull request
-          pr context <id>           pull request with commits, changed files and work items, as JSON
-          pr diff <id>              show the changes of a pull request (uses git; --json lists changed files)
-          pr checkout <id>          check out a pull request as local branch pr/<id>
-          pr create                 create a pull request (prompts, or --title --description --source --target)
-          pr approve <id>           approve a pull request
-          pr merge <id>             complete a pull request [--squash] [--yes]
-
-          workitem list             list work items assigned to you, open ones by default
-                                    [--all] [--assigned-to <who>] [--type <type>] [--state <state>|any]
-                                    [--area <path>] [--iteration <path>] [--tag <tag>]
-                                    [--title-contains <text>] [--contains <text>] [--wiql <condition>]
-                                    [--limit <n>] [--ids]
-          workitem show <id>        show a work item
-          workitem create           create a work item (prompts, or --type --title [--description]
-                                    [--assigned-to] [--area] [--iteration] [--tags] [--field Name=value])
-          workitem edit <id>...     change fields: --title --description --state --assigned-to
-                                    --area --iteration --tags --comment --field Name=value
-                                    --replace-title <old> --with <new>; - reads ids from stdin;
-                                    several ids are confirmed first [--yes] [--dry-run]
-
-          build list                list builds of the project, newest first [--limit <n>]
-          build show <id>           show a build
-          build run <definition-id> queue a build [--branch <branch>]
-
-        Inside a cloned Azure DevOps repository, project and repository are detected
-        from the origin remote. Otherwise pass --project <name> and --repo <name>,
-        or set a default project with ADO_PROJECT.
-
-        Settings are taken from flags, then ADO_* environment variables, then
-        ~/.ado/config.json. 'ado config list' shows which one applies.
-
-        Global flags:
-          --json            machine-readable output
-          --debug           log HTTP requests and show stack traces
-          --insecure        skip TLS certificate checks (internal servers only);
-                            --insecure=false overrides a saved setting
-          --ca-cert <file>  also trust the CA certificate(s) in this PEM file;
-                            --ca-cert none overrides a saved one
-          --limit <n>       list commands fetch at most n items (default: all)
-          --proxy <url>     use this HTTP(S) or SOCKS proxy; --proxy none connects
-                            directly (default: HTTPS_PROXY or system settings)
-          --help            show this help
-          --version         show version
-        """;
-
     /// <summary>The informational version, e.g. 0.4.2 or 0.4.2-dev.3, without the "+commit" suffix the SDK appends.</summary>
     public static string Version { get; } =
         Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('+')[0];
@@ -124,8 +55,8 @@ public static class Program
     {
         if (a.Has("--version"))
             return Print($"ado {Version}");
-        if (a.Has("--help") || a.Has("-h") || a.Positional.Count == 0 || a.At(0) == "help")
-            return Print(Help);
+        if (HelpPage(a) is { } page)
+            return Print(page);
 
         var ctx = new Context(a);
         return (a.At(0), a.At(1)) switch
@@ -156,8 +87,20 @@ public static class Program
             ("build", "list") => BuildCommands.ListAsync(ctx),
             ("build", "show") => BuildCommands.ShowAsync(ctx),
             ("build", "run") => BuildCommands.RunAsync(ctx),
-            _ => throw AdoException.Usage($"unknown command '{string.Join(' ', a.Positional.Take(2))}'. Run 'ado --help'."),
+            _ => throw AdoException.Usage($"unknown command '{string.Join(' ', a.Positional.Take(2))}'. Run '{(Help.For(a.At(0)) is null ? "ado" : $"ado {a.At(0)}")} --help'."),
         };
+    }
+
+    /// <summary>
+    /// The help to show, or null to run the command: 'ado pr', 'ado pr --help', 'ado pr merge --help' and 'ado help pr'
+    /// show the pr page; no command, 'ado help' and --help with an unknown command show the overview.
+    /// </summary>
+    public static string? HelpPage(Args a)
+    {
+        var command = a.At(0) == "help" ? a.At(1) : a.At(0);
+        if (a.Has("--help") || a.Has("-h") || a.At(0) == "help" || a.Positional.Count == 0)
+            return Help.For(command) ?? Help.Overview;
+        return a.Positional.Count == 1 ? Help.For(command) : null;
     }
 
     static Task<int> Print(string text)

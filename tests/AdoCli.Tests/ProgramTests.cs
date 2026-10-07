@@ -1,6 +1,7 @@
 namespace AdoCli.Tests;
 
 using AdoCli.Api;
+using AdoCli.Cli;
 
 public class ProgramTests
 {
@@ -12,14 +13,46 @@ public class ProgramTests
     }
 
     [Theory]
-    [InlineData("frobnicate")]
-    [InlineData("workitem", "frobnicate")]
-    public async Task UnknownCommandIsUsageError(params string[] argv)
+    [InlineData("ado --help", "frobnicate")]
+    [InlineData("ado workitem --help", "workitem", "frobnicate")]
+    public async Task UnknownCommandIsUsageError(string hint, params string[] argv)
     {
         var e = await Assert.ThrowsAsync<AdoException>(() => Program.RunAsync(Args.Parse(argv)));
 
         Assert.Equal(AdoException.InvalidUsage, e.ExitCode);
-        Assert.Contains("ado --help", e.Message);
+        Assert.Contains(hint, e.Message);
+    }
+
+    [Theory]
+    [InlineData("ado - a small CLI", "--help")]
+    [InlineData("ado - a small CLI", "help")]
+    [InlineData("ado - a small CLI", "frobnicate", "--help")]
+    [InlineData("ado workitem - work items", "workitem")]
+    [InlineData("ado workitem - work items", "workitem", "--help")]
+    [InlineData("ado workitem - work items", "workitem", "edit", "-h")]
+    [InlineData("ado workitem - work items", "help", "workitem")]
+    [InlineData("ado pr - pull requests", "pr", "merge", "142", "--help")]
+    public void HelpShowsTheCommandPageOrTheOverview(string heading, params string[] argv) =>
+        Assert.StartsWith(heading, Program.HelpPage(Args.Parse(argv)));
+
+    [Theory]
+    [InlineData("frobnicate")]
+    [InlineData("workitem", "list")]
+    [InlineData("pr", "show", "142")]
+    public void CommandsRunWithoutHelp(params string[] argv) =>
+        Assert.Null(Program.HelpPage(Args.Parse(argv)));
+
+    [Theory]
+    [InlineData("auth")]
+    [InlineData("config")]
+    [InlineData("repo")]
+    [InlineData("pr")]
+    [InlineData("workitem")]
+    [InlineData("build")]
+    public void EveryCommandHasAHelpPageListedInTheOverview(string command)
+    {
+        Assert.StartsWith($"ado {command} - ", Help.For(command));
+        Assert.Contains($"\n  {command} ", Help.Overview);
     }
 
     [Fact]

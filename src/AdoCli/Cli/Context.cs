@@ -46,14 +46,22 @@ public sealed class Context(Args args, Config? config = null)
         InsecureFlag ?? Config.Insecure ?? false,
         Setting("caCert").Value is { } ca && !ca.Equals("none", StringComparison.OrdinalIgnoreCase) ? ca : null);
 
-    /// <summary>The handler for every <see cref="AdoClient"/>; warns when certificate checks are off.</summary>
+    /// <summary>--proxy, else ADO_PROXY / config: a proxy URL or "none"; null means the system proxy.</summary>
+    public string? ProxyUrl => args.Get("--proxy") ?? Config.Proxy;
+
+    /// <summary>The handler for every <see cref="AdoClient"/>, with TLS and proxy settings; warns when certificate checks are off.</summary>
     public HttpMessageHandler CreateHandler()
     {
         var tls = Tls;
         if (tls.Insecure)
             Console.Error.WriteLine($"Warning: TLS certificate verification is disabled (from {Setting("insecure").Source}).");
-        return tls.CreateHandler();
+        var handler = tls.CreateHandler();
+        Proxy.Apply(handler, ProxyUrl);
+        return handler;
     }
+
+    /// <summary>git -c options for commands that reach the server: proxy (full URL, not stored) then TLS.</summary>
+    public string[] GitConfig() => [.. Proxy.GitConfig(ProxyUrl), .. Tls.GitConfig()];
 
     /// <summary>Every setting in <see cref="Config.Keys"/> order, with the same precedence the commands use.</summary>
     public IReadOnlyList<Setting> Settings() => Config.Keys.Select(Setting).ToList();
@@ -71,6 +79,8 @@ public sealed class Context(Args args, Config? config = null)
             : Config.Insecure is { } i ? FromConfig(key, Bool(i)) : new(key, "false", "default"),
         "caCert" => args.Get("--ca-cert") is { } ca ? new(key, ca, "--ca-cert")
             : Config.CaCert is { } c ? FromConfig(key, c) : new(key, null, "not set"),
+        "proxy" => args.Get("--proxy") is { } px ? new(key, Proxy.Mask(px), "--proxy")
+            : Config.Proxy is { } c ? FromConfig(key, Proxy.Mask(c)) : new(key, null, "system default"),
         _ => throw AdoException.Usage($"unknown setting '{key}'; known: {string.Join(", ", Config.Keys)}"),
     };
 

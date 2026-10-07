@@ -69,7 +69,7 @@ public static class PrCommands
         if (pr.LastMergeSourceCommit is null || pr.LastMergeTargetCommit is null)
             throw new AdoException($"PR #{pr.PullRequestId} has no merge commits to compare yet");
 
-        GitClient.Check([.. ctx.Tls.GitConfig(), "fetch", "--quiet", "origin", pr.TargetRefName, pr.SourceRefName]);
+        GitClient.Check([.. ctx.GitConfig(), "fetch", "--quiet", "origin", pr.TargetRefName, pr.SourceRefName]);
         return GitClient.Passthrough("diff", $"{pr.LastMergeTargetCommit.CommitId}...{pr.LastMergeSourceCommit.CommitId}");
     }
 
@@ -82,7 +82,7 @@ public static class PrCommands
         var branch = $"pr/{pr.PullRequestId}";
         var exists = GitClient.Run(["rev-parse", "--verify", "--quiet", $"refs/heads/{branch}"]).ExitCode == 0;
         foreach (var args in CheckoutCommands(branch, pr.SourceRefName, exists))
-            GitClient.Check([.. ctx.Tls.GitConfig(), .. args]);
+            GitClient.Check([.. ctx.GitConfig(), .. args]);
         Console.Error.WriteLine($"Switched to branch {branch} ({Output.Branch(pr.SourceRefName)})");
         return 0;
     }

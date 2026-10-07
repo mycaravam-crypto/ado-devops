@@ -14,7 +14,7 @@ public sealed record Tls(bool Insecure = false, string? CaCert = null)
         "To skip certificate checks entirely (internal servers only): ado config set insecure true (or --insecure / ADO_INSECURE=1).";
 
     /// <summary>The HTTP handler for <see cref="AdoClient"/>; the CA file is read here so a bad path fails before any request.</summary>
-    public HttpMessageHandler CreateHandler()
+    public SocketsHttpHandler CreateHandler()
     {
         var handler = new SocketsHttpHandler();
         if (Insecure)

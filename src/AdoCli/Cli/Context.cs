@@ -6,10 +6,10 @@ using AdoCli.Git;
 /// <summary>A setting in effect and where it came from: a flag, an environment variable, "config file", "git remote", "default" or "not set".</summary>
 public sealed record Setting(string Key, string? Value, string Source);
 
-/// <summary>What a command needs: arguments, configuration, git context and a lazily created client.</summary>
-public sealed class Context(Args args, Config? config = null)
+/// <summary>What a command needs: arguments, configuration, git context and a lazily created client (or the one given, for tests).</summary>
+public sealed class Context(Args args, Config? config = null, AdoClient? client = null)
 {
-    AdoClient? _client;
+    AdoClient? _client = client;
     Lazy<Remote?>? _remote;
 
     public Args Args => args;

@@ -113,7 +113,7 @@ public static class Program
     }
 
     /// <summary>Dispatches &lt;command&gt; &lt;subcommand&gt; to its handler; --help and --version need no configuration.</summary>
-    static Task<int> RunAsync(Args a)
+    public static Task<int> RunAsync(Args a)
     {
         if (a.Has("--version"))
             return Print($"ado {Version}");

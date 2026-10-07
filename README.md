@@ -157,6 +157,7 @@ ado pr create                 # prompts; or --title t [--description d] [--sourc
 
 ```bash
 ado workitem list             # open items assigned to you (current project, if known); --limit n for the n most recently changed
+ado workitem list --type Bug --state Active,Resolved
 ado workitem show 4711        # title, type, state, assignee, then every other field the server returns
 ado workitem create           # prompts; or --type Bug --title t [--description d] [field options]
 ado workitem edit 4711 --state Active --assigned-to jane@company.local --comment "Picked up"
@@ -176,6 +177,11 @@ Field options, for both `create` and `edit`:
 | `--comment` | adds a comment to the discussion (`System.History`) |
 | `--field Name=value` | any field by reference name, e.g. `--field Microsoft.VSTS.Common.Priority=1`; can be repeated |
 
+- `workitem list` shows id, type, state, priority, iteration, date last changed and title. `--type` and `--state` keep
+  only those types and states; both can be repeated or take a comma-separated list (`--type Bug,"User Story"`), and the
+  server matches them case-insensitively. Without `--state` it lists every state but Closed, Done and Removed; with it,
+  closed items can be listed too (`--state Closed`). The filters go into the query, so `--limit n` returns the n most
+  recently changed matches. `--json` prints the same fields.
 - `workitem create` needs a project (see [Configuration](#configuration)). The type is the process template's name,
   e.g. `Bug`, `Task` or `"User Story"`. When stdin is not a terminal, `--type` and `--title` are required.
   It prints the new id; `--json` prints the whole work item.

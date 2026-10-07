@@ -6,18 +6,32 @@ using AdoCli.Api;
 
 public static partial class WorkItemCommands
 {
+    /// <summary>ado workitem list: work items assigned to you, open ones unless --state says otherwise; --type and --state narrow it down.</summary>
     public static async Task<int> ListAsync(Context ctx)
     {
-        var items = await ctx.Client.GetMyWorkItemsAsync(ctx.Project, ctx.Limit);
+        var items = await ctx.Client.GetMyWorkItemsAsync(ctx.Project, ctx.Limit, Values(ctx.Args, "--type"), Values(ctx.Args, "--state"));
         if (ctx.Json)
             return Output.WriteJson(items);
 
-        Output.Table(["ID", "TYPE", "STATE", "TITLE"], items.Select(w => new[]
-        {
-            w.Id.ToString(), w.Field("System.WorkItemType"), w.Field("System.State"), w.Field("System.Title"),
-        }));
+        Output.Table(["ID", "TYPE", "STATE", "PRI", "ITERATION", "CHANGED", "TITLE"], items.Select(ListRow));
         return 0;
     }
+
+    /// <summary>A row of <c>workitem list</c>: id, type, state, priority, iteration path, date last changed (local time) and title.</summary>
+    public static string[] ListRow(WorkItem w) =>
+    [
+        w.Id.ToString(),
+        w.Field("System.WorkItemType"),
+        w.Field("System.State"),
+        w.Field("Microsoft.VSTS.Common.Priority"),
+        w.Field("System.IterationPath"),
+        DateTimeOffset.TryParse(w.Field("System.ChangedDate"), out var changed) ? changed.ToLocalTime().ToString("yyyy-MM-dd") : "",
+        w.Field("System.Title"),
+    ];
+
+    /// <summary>Every value of a repeatable option, also split at commas: --type Bug,Task --type "User Story".</summary>
+    public static List<string> Values(Args a, string option) =>
+        a.GetAll(option).SelectMany(v => (v ?? "").Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
     public static async Task<int> ShowAsync(Context ctx)
     {

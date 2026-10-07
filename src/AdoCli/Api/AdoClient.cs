@@ -128,24 +128,43 @@ public sealed class AdoClient
     public Task<WorkItem> GetWorkItemAsync(int id) =>
         SendAsync<WorkItem>(HttpMethod.Get, Url(null, $"wit/workitems/{id}"));
 
-    /// <summary>Open work items assigned to the current user, most recently changed first; all of them (the server caps a query at 20000) unless <paramref name="limit"/> is set.</summary>
-    public async Task<List<WorkItem>> GetMyWorkItemsAsync(string? project, int? limit = null)
+    /// <summary>
+    /// Work items assigned to the current user, most recently changed first; all of them (the server caps a query at 20000)
+    /// unless <paramref name="limit"/> is set. Only the given <paramref name="types"/> when there are any; only the given
+    /// <paramref name="states"/> when there are any, else every state but Closed, Done and Removed.
+    /// </summary>
+    public async Task<List<WorkItem>> GetMyWorkItemsAsync(string? project, int? limit = null,
+        IReadOnlyCollection<string>? types = null, IReadOnlyCollection<string>? states = null)
     {
-        var inProject = project is null ? "" : " AND [System.TeamProject] = @project";
-        var wiql = "SELECT [System.Id] FROM WorkItems WHERE [System.AssignedTo] = @Me AND [System.State] NOT IN ('Closed', 'Done', 'Removed')"
-            + inProject + " ORDER BY [System.ChangedDate] DESC";
+        var wiql = "SELECT [System.Id] FROM WorkItems WHERE [System.AssignedTo] = @Me"
+            + (states is { Count: > 0 } ? $" AND [System.State] IN ({WiqlList(states)})" : " AND [System.State] NOT IN ('Closed', 'Done', 'Removed')")
+            + (types is { Count: > 0 } ? $" AND [System.WorkItemType] IN ({WiqlList(types)})" : "")
+            + (project is null ? "" : " AND [System.TeamProject] = @project")
+            + " ORDER BY [System.ChangedDate] DESC";
         var result = await SendAsync<WiqlResult>(HttpMethod.Post, Url(project, "wit/wiql", limit is { } top ? $"$top={top}" : ""), new { query = wiql });
-        return await GetWorkItemsAsync(result.WorkItems.Select(w => w.Id));
+        return await GetWorkItemsAsync(result.WorkItems.Select(w => w.Id), ListFields);
     }
 
-    /// <summary>Title, type and state of the given work items, in the given order; ones that are deleted or not visible are left out.</summary>
-    public async Task<List<WorkItem>> GetWorkItemsAsync(IEnumerable<int> ids)
+    /// <summary>Fields <see cref="GetMyWorkItemsAsync"/> returns: what <c>workitem list</c> shows.</summary>
+    public static readonly string[] ListFields =
+        ["System.Title", "System.WorkItemType", "System.State", "Microsoft.VSTS.Common.Priority", "System.IterationPath", "System.ChangedDate"];
+
+    // WIQL string literals are single-quoted; a quote inside one is doubled.
+    static string WiqlList(IEnumerable<string> values) =>
+        string.Join(", ", values.Select(v => "'" + v.Replace("'", "''") + "'"));
+
+    /// <summary>
+    /// The given work items, in the given order, with <paramref name="fields"/> (default: title, type and state);
+    /// ones that are deleted or not visible are left out.
+    /// </summary>
+    public async Task<List<WorkItem>> GetWorkItemsAsync(IEnumerable<int> ids, IEnumerable<string>? fields = null)
     {
+        var fieldList = string.Join(',', fields ?? ["System.Title", "System.WorkItemType", "System.State"]);
         // The server accepts at most 200 ids per request.
         var all = new List<WorkItem>();
         foreach (var chunk in ids.Chunk(200))
         {
-            var query = $"ids={string.Join(',', chunk)}&fields=System.Title,System.WorkItemType,System.State&errorPolicy=omit";
+            var query = $"ids={string.Join(',', chunk)}&fields={fieldList}&errorPolicy=omit";
             all.AddRange((await SendAsync<ListResponse<WorkItem?>>(HttpMethod.Get, Url(null, "wit/workitems", query))).Value.OfType<WorkItem>());
         }
         return all;

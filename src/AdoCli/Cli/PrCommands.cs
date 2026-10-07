@@ -5,11 +5,11 @@ using AdoCli.Git;
 
 public static class PrCommands
 {
-    /// <summary>ado pr list: PRs of the repository (or project), active unless --status says otherwise; --mine keeps your own.</summary>
+    /// <summary>ado pr list: PRs of the repository (or project), active unless --status says otherwise; --mine keeps your own, --limit caps the count.</summary>
     public static async Task<int> ListAsync(Context ctx)
     {
         Guid? creator = ctx.Args.Has("--mine") ? (await ctx.Client.GetConnectionDataAsync()).AuthenticatedUser.Id : null;
-        var prs = await ctx.Client.GetPullRequestsAsync(ctx.RequireProject(), ctx.Repo, ctx.Args.Get("--status") ?? "active", creator);
+        var prs = await ctx.Client.GetPullRequestsAsync(ctx.RequireProject(), ctx.Repo, ctx.Args.Get("--status") ?? "active", creator, ctx.Limit);
         if (ctx.Json)
             return Output.WriteJson(prs);
 

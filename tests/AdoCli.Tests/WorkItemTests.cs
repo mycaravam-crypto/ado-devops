@@ -34,6 +34,34 @@ public class WorkItemTests
     }
 
     [Fact]
+    public async Task FetchesAllQueriedWorkItemsInBatchesOf200()
+    {
+        var refs = string.Join(',', Enumerable.Range(1, 450).Select(i => $"{{\"id\":{i}}}"));
+        var stub = new StubHandler(n => n == 0
+            ? StubHandler.Json($$"""{"workItems":[{{refs}}]}""")
+            : StubHandler.Json("""{"value":[{"id":1,"fields":{}}]}"""));
+
+        var items = await new AdoClient("https://tfs", "pat", handler: stub).GetMyWorkItemsAsync("Platform");
+
+        Assert.Equal("https://tfs/Platform/_apis/wit/wiql?api-version=5.0", stub.Requests[0].Url);
+        Assert.Equal(4, stub.Requests.Count);
+        Assert.Contains("ids=1,2,", stub.Requests[1].Url);
+        Assert.Contains("ids=201,", stub.Requests[2].Url);
+        Assert.Contains("ids=401,", stub.Requests[3].Url);
+        Assert.Equal(3, items.Count);
+    }
+
+    [Fact]
+    public async Task LimitCapsTheQuery()
+    {
+        var stub = new StubHandler(HttpStatusCode.OK, """{"workItems":[]}""");
+
+        await new AdoClient("https://tfs", "pat", handler: stub).GetMyWorkItemsAsync("Platform", limit: 10);
+
+        Assert.Equal("https://tfs/Platform/_apis/wit/wiql?$top=10&api-version=5.0", stub.Requests[0].Url);
+    }
+
+    [Fact]
     public void ConvertsHtmlDescriptionToText()
     {
         Assert.Equal("Do <it>\nnow", WorkItemCommands.PlainText("<div>Do &lt;it&gt;</div><div><b>now</b></div>"));

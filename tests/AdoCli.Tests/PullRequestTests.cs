@@ -26,10 +26,49 @@ public class PullRequestTests
         var prs = await new AdoClient("https://tfs", "pat", handler: stub).GetPullRequestsAsync("Platform", "connector", "active", me);
 
         Assert.Equal(
-            $"https://tfs/Platform/_apis/git/repositories/connector/pullrequests?searchCriteria.status=active&$top=50&searchCriteria.creatorId={me}&api-version=5.0",
+            $"https://tfs/Platform/_apis/git/repositories/connector/pullrequests?searchCriteria.status=active&searchCriteria.creatorId={me}&$top=100&$skip=0&api-version=5.0",
             stub.Requests[0].Url);
         Assert.Equal(142, prs.Single().PullRequestId);
     }
+
+    [Fact]
+    public async Task ListsAllPullRequestsPageByPage()
+    {
+        var stub = new StubHandler(n => StubHandler.Json(Page(n < 2 ? 100 : 7)));
+
+        var prs = await new AdoClient("https://tfs", "pat", handler: stub).GetPullRequestsAsync("Platform", null, "active", null);
+
+        Assert.Equal(207, prs.Count);
+        Assert.Equal(["$top=100&$skip=0", "$top=100&$skip=100", "$top=100&$skip=200"],
+            stub.Requests.Select(r => r.Url.Split("active&")[1].Split("&api-version")[0]));
+    }
+
+    [Fact]
+    public async Task StopsAtLimit()
+    {
+        var stub = new StubHandler(n => StubHandler.Json(Page(n == 0 ? 100 : 30)));
+
+        var prs = await new AdoClient("https://tfs", "pat", handler: stub).GetPullRequestsAsync("Platform", null, "all", null, limit: 130);
+
+        Assert.Equal(130, prs.Count);
+        Assert.Contains("$top=30&$skip=100", stub.Requests[1].Url);
+        Assert.Equal(2, stub.Requests.Count);
+    }
+
+    [Fact]
+    public async Task FollowsCommitContinuationToken()
+    {
+        var stub = new StubHandler(n => StubHandler.Json($$"""{"value":[{"commitId":"c{{n}}"}]}""", n == 0 ? "next" : null));
+        var client = new AdoClient("https://tfs", "pat", handler: stub);
+
+        var commits = await client.GetPullRequestCommitsAsync(JsonSerializer.Deserialize<PullRequest>(Pr, Json.Options)!);
+
+        Assert.Equal(["c0", "c1"], commits.Select(c => c.CommitId));
+        Assert.EndsWith("/pullrequests/142/commits?continuationToken=next&api-version=5.0", stub.Requests[1].Url);
+    }
+
+    static string Page(int count) =>
+        $$"""{"count":{{count}},"value":[{{string.Join(',', Enumerable.Repeat(Pr, count))}}]}""";
 
     [Fact]
     public async Task GetsPullRequestByIdAcrossProjects()

@@ -28,7 +28,7 @@ public static class Program
           repo clone <repo> [dir]   clone a repository with git
           repo status               show the Azure DevOps repository of the current directory
 
-          pr list                   list pull requests of the project/repository [--mine] [--status active|completed|abandoned|all]
+          pr list                   list pull requests of the project/repository [--mine] [--status active|completed|abandoned|all] [--limit <n>]
           pr show <id>              show a pull request
           pr context <id>           pull request with commits, changed files and work items, as JSON
           pr diff <id>              show the changes of a pull request (uses git; --json lists changed files)
@@ -37,10 +37,10 @@ public static class Program
           pr approve <id>           approve a pull request
           pr merge <id>             complete a pull request [--squash] [--yes]
 
-          workitem list             list open work items assigned to you
+          workitem list             list open work items assigned to you [--limit <n>]
           workitem show <id>        show a work item
 
-          build list                list recent builds of the project
+          build list                list builds of the project, newest first [--limit <n>]
           build show <id>           show a build
           build run <definition-id> queue a build [--branch <branch>]
 
@@ -58,6 +58,7 @@ public static class Program
                             --insecure=false overrides a saved setting
           --ca-cert <file>  also trust the CA certificate(s) in this PEM file;
                             --ca-cert none overrides a saved one
+          --limit <n>       list commands fetch at most n items (default: all)
           --proxy <url>     use this HTTP(S) or SOCKS proxy; --proxy none connects
                             directly (default: HTTPS_PROXY or system settings)
           --help            show this help

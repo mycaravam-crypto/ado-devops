@@ -133,7 +133,7 @@ settings on to git (see [Configuration](#configuration)).
 ## Pull requests
 
 ```bash
-ado pr list [--mine] [--status active|completed|abandoned|all]
+ado pr list [--mine] [--status active|completed|abandoned|all] [--limit n]
 ado pr show 142               # details, changed file count, description, reviewer votes
 ado pr context 142            # PR, commits, changed files and linked work items as one JSON document
 ado pr checkout 142           # local branch pr/142; refuses to run on a dirty tree
@@ -143,8 +143,8 @@ ado pr merge 142 [--squash] [--yes]
 ado pr create                 # prompts; or --title t [--description d] [--source b] [--target b]
 ```
 
-- `pr list` shows up to 50 pull requests of the current repository, or of the whole project outside a clone. Without
-  `--status` it lists active ones.
+- `pr list` shows all pull requests of the current repository, or of the whole project outside a clone; `--limit n`
+  stops after n. Without `--status` it lists active ones.
 - `pr checkout` and `pr diff` run git and must be run inside a clone of the PR's repository. If `pr/<id>` already
   exists, `pr checkout` only fast-forwards it, so local commits on it are never lost. `pr diff --json` lists the
   changed files from the server and works anywhere.
@@ -156,7 +156,7 @@ ado pr create                 # prompts; or --title t [--description d] [--sourc
 ## Work items
 
 ```bash
-ado workitem list             # open items assigned to you (current project, if known), up to 50
+ado workitem list             # open items assigned to you (current project, if known); --limit n for the n most recently changed
 ado workitem show 4711
 ```
 
@@ -165,7 +165,7 @@ Read-only: `ado` does not create or edit work items.
 ## Builds
 
 ```bash
-ado build list                # the 20 most recently queued builds of the project
+ado build list                # builds of the project, most recently queued first; --limit n for the latest n
 ado build show 815
 ado build run <definition-id> [--branch b]   # default: the definition's default branch
 ```

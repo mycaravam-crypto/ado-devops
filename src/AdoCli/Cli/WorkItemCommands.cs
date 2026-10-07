@@ -8,7 +8,7 @@ public static partial class WorkItemCommands
 {
     public static async Task<int> ListAsync(Context ctx)
     {
-        var items = await ctx.Client.GetMyWorkItemsAsync(ctx.Project);
+        var items = await ctx.Client.GetMyWorkItemsAsync(ctx.Project, ctx.Limit);
         if (ctx.Json)
             return Output.WriteJson(items);
 

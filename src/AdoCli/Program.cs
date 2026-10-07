@@ -64,7 +64,9 @@ public static class Program
           --version         show version
         """;
 
-    public static string Version { get; } = Assembly.GetExecutingAssembly().GetName().Version!.ToString(3);
+    /// <summary>The informational version, e.g. 0.4.2 or 0.4.2-dev.3, without the "+commit" suffix the SDK appends.</summary>
+    public static string Version { get; } =
+        Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('+')[0];
 
     /// <summary>Entry point: runs one command and turns every error into a message on stderr and an exit code.</summary>
     public static async Task<int> Main(string[] argv)

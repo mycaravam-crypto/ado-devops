@@ -7,8 +7,31 @@
     <Nullable>enable</Nullable>
     <AssemblyName>ado</AssemblyName>
     <RootNamespace>AdoCli</RootNamespace>
-    <Version>0.1.0</Version>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Evaluated before the SDK's default of 1.0.0, so only a version passed with -p:Version counts. -->
+    <VersionGiven Condition="'$(Version)' != ''">true</VersionGiven>
   </PropertyGroup>
+
+  <!--
+    The version comes from the latest vX.Y.Z git tag, which the release workflow creates on every merge to main:
+    "0.4.2" at the tagged commit, "0.4.2-dev.3" three commits later, "0.0.0-dev" without git or tags.
+    Release builds pass -p:Version=X.Y.Z instead, which skips this target.
+  -->
+  <Target Name="SetVersionFromGitTag" BeforeTargets="GetAssemblyVersion;GenerateAssemblyInfo" Condition="'$(VersionGiven)' != 'true'">
+    <Exec Command="git describe --tags --long --match &quot;v[0-9]*.[0-9]*.[0-9]*&quot; --exclude &quot;v*-*&quot;" WorkingDirectory="$(MSBuildProjectDirectory)"
+          ConsoleToMSBuild="true" IgnoreExitCode="true" EchoOff="true" StandardOutputImportance="low" StandardErrorImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_GitDescribe" />
+      <Output TaskParameter="ExitCode" PropertyName="_GitDescribeExitCode" />
+    </Exec>
+    <PropertyGroup>
+      <_GitTagVersion Condition="'$(_GitDescribeExitCode)' == '0' and $([System.Text.RegularExpressions.Regex]::IsMatch('$(_GitDescribe)', '^v(\d+\.\d+\.\d+)-(\d+)-g[0-9a-f]+$'))">$([System.Text.RegularExpressions.Regex]::Replace('$(_GitDescribe)', '^v(\d+\.\d+\.\d+)-(\d+)-g[0-9a-f]+$', '$1'))</_GitTagVersion>
+      <_GitHeight Condition="'$(_GitTagVersion)' != ''">$([System.Text.RegularExpressions.Regex]::Replace('$(_GitDescribe)', '^v(\d+\.\d+\.\d+)-(\d+)-g[0-9a-f]+$', '$2'))</_GitHeight>
+      <Version Condition="'$(_GitTagVersion)' != ''">$(_GitTagVersion)</Version>
+      <Version Condition="'$(_GitTagVersion)' == ''">0.0.0</Version>
+      <InformationalVersion Condition="'$(_GitHeight)' == '0'">$(Version)</InformationalVersion>
+      <InformationalVersion Condition="'$(_GitHeight)' != '' and '$(_GitHeight)' != '0'">$(Version)-dev.$(_GitHeight)</InformationalVersion>
+      <InformationalVersion Condition="'$(_GitTagVersion)' == ''">0.0.0-dev</InformationalVersion>
+    </PropertyGroup>
+  </Target>
 
 </Project>

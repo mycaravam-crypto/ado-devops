@@ -37,11 +37,11 @@ public sealed class AdoClient
     }
 
     /// <summary>{server}[/{project}]/_apis/{path}?{query}&amp;api-version=...</summary>
-    public string Url(string? project, string path, string query = "")
+    public string Url(string? project, string path, string query = "", string? apiVersion = null)
     {
         var scope = project is null ? "" : "/" + Uri.EscapeDataString(project);
         var q = query.Length > 0 ? query + "&" : "";
-        return $"{_server}{scope}/_apis/{path}?{q}api-version={_apiVersion}";
+        return $"{_server}{scope}/_apis/{path}?{q}api-version={apiVersion ?? _apiVersion}";
     }
 
     // connectionData only exists as a preview API, so it is called without api-version.
@@ -229,23 +229,24 @@ public sealed class AdoClient
     static object[] FieldPatch(IReadOnlyDictionary<string, string> fields) =>
         fields.Select(f => (object)new { op = "add", path = "/fields/" + f.Key, value = f.Value }).ToArray();
 
-    // Test plans use the "test" area, which is released (not preview) from api-version 5.0 and still served by
-    // Azure DevOps Server 2020 (Dev18) and later, so the one configured version works for them too.
+    // The legacy "test" area uses REST API 5.0 on Azure DevOps Server 2020 (Dev18.M170).
+    // Keep this independent of the global version used by Git, WIT and Build endpoints.
+    const string LegacyTestApiVersion = "5.0";
 
     /// <summary>Test plans of the project; all of them unless <paramref name="limit"/> is set.</summary>
     public Task<List<TestPlan>> GetTestPlansAsync(string project, int? limit = null) =>
-        PageAsync<TestPlan>(project, "test/plans", "", limit);
+        PageAsync<TestPlan>(project, "test/plans", "", limit, apiVersion: LegacyTestApiVersion);
 
     public Task<TestPlan> GetTestPlanAsync(string project, int planId) =>
-        SendAsync<TestPlan>(HttpMethod.Get, Url(project, $"test/plans/{planId}"));
+        SendAsync<TestPlan>(HttpMethod.Get, Url(project, $"test/plans/{planId}", apiVersion: LegacyTestApiVersion));
 
     /// <summary>Every suite of the plan, the root suite included, flat; each names its parent.</summary>
     public Task<List<TestSuite>> GetTestSuitesAsync(string project, int planId) =>
-        PageAsync<TestSuite>(project, $"test/plans/{planId}/suites", "", null);
+        PageAsync<TestSuite>(project, $"test/plans/{planId}/suites", "", null, apiVersion: LegacyTestApiVersion);
 
     /// <summary>The ids of the test cases in a suite, in the order the server keeps them.</summary>
     public async Task<List<int>> GetSuiteTestCaseIdsAsync(string project, int planId, int suiteId) =>
-        (await SendAsync<ListResponse<SuiteTestCase>>(HttpMethod.Get, Url(project, $"test/plans/{planId}/suites/{suiteId}/testcases")))
+        (await SendAsync<ListResponse<SuiteTestCase>>(HttpMethod.Get, Url(project, $"test/plans/{planId}/suites/{suiteId}/testcases", apiVersion: LegacyTestApiVersion)))
             .Value.Select(c => c.TestCase.Id).ToList();
 
     /// <summary>Builds of the project, most recently queued first; all of them unless <paramref name="limit"/> is set.</summary>
@@ -274,14 +275,14 @@ public sealed class AdoClient
         SendAsync<Build>(HttpMethod.Post, Url(project, "build/builds"), new { definition = new { id = definitionId }, sourceBranch });
 
     /// <summary>Pages through a list with $top/$skip until the server returns a short page or <paramref name="limit"/> items are read.</summary>
-    async Task<List<T>> PageAsync<T>(string project, string path, string query, int? limit, int pageSize = 100)
+    async Task<List<T>> PageAsync<T>(string project, string path, string query, int? limit, int pageSize = 100, string? apiVersion = null)
     {
         var all = new List<T>();
         while (limit is null || all.Count < limit)
         {
             var top = Math.Min(pageSize, limit - all.Count ?? pageSize);
             var paging = $"$top={top}&$skip={all.Count}";
-            var page = (await SendAsync<ListResponse<T>>(HttpMethod.Get, Url(project, path, query.Length > 0 ? $"{query}&{paging}" : paging))).Value;
+            var page = (await SendAsync<ListResponse<T>>(HttpMethod.Get, Url(project, path, query.Length > 0 ? $"{query}&{paging}" : paging, apiVersion))).Value;
             all.AddRange(page);
             if (page.Count < top)
                 break;

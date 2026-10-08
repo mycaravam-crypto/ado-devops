@@ -339,6 +339,21 @@ public class TestPlanTests
         Assert.Equal("https://tfs/Platform/_apis/test/plans?$top=100&$skip=0&api-version=5.0", server.Urls[0]);
     }
 
+    [Fact]
+    public async Task LegacyTestEndpointsUseFiveEvenWhenGlobalApiVersionIsSix()
+    {
+        var server = new FakeServer("6.0");
+        var plans = await server.Client.GetTestPlansAsync("Platform");
+        Assert.Single(plans);
+        await TestPlanCommands.ExportAsync(server.Client, "Platform", 12);
+
+        Assert.Contains("https://tfs/Platform/_apis/test/plans?$top=100&$skip=0&api-version=5.0", server.Urls);
+        Assert.Contains("https://tfs/Platform/_apis/test/plans/12?api-version=5.0", server.Urls);
+        Assert.Contains("https://tfs/Platform/_apis/test/plans/12/suites?$top=100&$skip=0&api-version=5.0", server.Urls);
+        Assert.Contains("https://tfs/Platform/_apis/test/plans/12/suites/14/testcases?api-version=5.0", server.Urls);
+        Assert.Contains(server.Urls, url => url.Contains("/_apis/wit/workitems?") && url.EndsWith("api-version=6.0"));
+    }
+
     static (string, string, string) Op(JsonNode? op) => ((string)op!["op"]!, (string)op["path"]!, op["value"]!.ToJsonString());
 
     static Context Ctx(FakeServer server, params string[] argv) =>
@@ -358,9 +373,9 @@ public class TestPlanTests
     {
         readonly Dictionary<int, List<JsonObject>> _revisions = [];
 
-        public FakeServer()
+        public FakeServer(string apiVersion = AdoClient.DefaultApiVersion)
         {
-            Client = new AdoClient("https://tfs", "pat", handler: this);
+            Client = new AdoClient("https://tfs", "pat", handler: this, apiVersion: apiVersion);
             Add(101, 5, "Login works", StepsOf101, new JsonObject { ["displayName"] = "Jane Doe", ["uniqueName"] = "jane@company.local" });
             Add(102, 2, "Form validation", StepsOf102, null);
             Add(103, 1, "Checkout", null, null);

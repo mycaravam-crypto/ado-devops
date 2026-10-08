@@ -45,6 +45,15 @@ public class AdoClientTests
     }
 
     [Fact]
+    public void PerRequestApiVersionDoesNotChangeGlobalVersion()
+    {
+        var client = new AdoClient("https://tfs", "pat", apiVersion: "6.0");
+        Assert.Equal("https://tfs/My%20Project/_apis/test/plans?$top=10&api-version=5.0",
+            client.Url("My Project", "test/plans", "$top=10", apiVersion: "5.0"));
+        Assert.Equal("https://tfs/_apis/git/repositories?api-version=6.0", client.Url(null, "git/repositories"));
+    }
+
+    [Fact]
     public async Task ExplainsUnsupportedApiVersion()
     {
         var stub = new StubHandler(HttpStatusCode.BadRequest,

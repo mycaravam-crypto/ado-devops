@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using AdoCli.Api;
 using AdoCli.Cli;
 
+[Collection("Console output tests")]
 public class WorkItemTests
 {
     [Fact]
@@ -124,7 +125,7 @@ public class WorkItemTests
             Assert.Equal(0, await WorkItemCommands.ListAsync(Ctx(stub, "workitem", "list")));
         }
         finally { Console.SetOut(original); }
-        Assert.EndsWith(footer + Environment.NewLine, writer.ToString());
+        Assert.Contains(Environment.NewLine + footer + Environment.NewLine, writer.ToString());
         Assert.Contains("ID", writer.ToString());
     }
 
@@ -528,3 +529,6 @@ public class WorkItemTests
         Assert.Empty(stub.Requests);
     }
 }
+
+[CollectionDefinition("Console output tests", DisableParallelization = true)]
+public class ConsoleOutputTestCollection;

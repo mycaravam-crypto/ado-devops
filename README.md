@@ -166,6 +166,7 @@ ado pr create                 # prompts; or --title t [--description d] [--sourc
 ```bash
 ado workitem list             # open items assigned to you (current project, if known); --limit n for the n most recently changed
 ado workitem list --type Bug --state Active,Resolved
+ado workitem list --limit 200 --summary            # displayed count, type/state/priority breakdown; no extra API call
 ado workitem list --all --state any --contains tzu   # everyone's items, any state, "tzu" in title or description
 ado workitem show 4711        # title, type, state, assignee, then every other field the server returns
 ado workitem create           # prompts; or --type Bug --title t [--description d] [field options]

@@ -1,7 +1,7 @@
 # ado
 
 A small command-line client for **Azure DevOps Server** (on-prem), in the spirit of `gh`.
-It covers the everyday workflow — repositories, pull requests, work items, builds — not the whole API.
+It covers the everyday workflow — repositories, pull requests, work items, test plans, builds — not the whole API.
 
 ## Installation
 

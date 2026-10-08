@@ -280,7 +280,7 @@ public static class TestPlanCommands
                 changes.Add(was < 0 ? $"{label}: moved out of shared steps" : $"{label}: moved (was step {was + 1})");
         }
         var kept = Flatten(after).Select(s => s.Id).OfType<int>().ToHashSet();
-        foreach (var (s, i) in before.Select((s, i) => (s, i)).Where(p => p.s.Id is not { } id || !kept.Contains(id)))
+        foreach (var (s, i) in before.Select((s, i) => (s, i)).Where(p => p.s.Id is { } id && !kept.Contains(id)))
             changes.Add($"removed (was step {i + 1}): {Short(s.Action ?? $"shared steps #{s.SharedStepsId}")}");
         return changes;
     }

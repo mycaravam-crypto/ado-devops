@@ -21,12 +21,34 @@ public static partial class WorkItemCommands
         if (ctx.Json)
             return Output.WriteJson(items);
 
-        Output.Table(["ID", "TYPE", "STATE", "PRI", "ITERATION", "CHANGED", "TITLE"], items.Select(ListRow));
+        Output.Table(["ID", "TYPE", "STATE", "ASSIGNED TO", "PRI", "ITERATION", "CHANGED", "TITLE"], items.Select(ListRow));
         Console.WriteLine();
         Console.WriteLine(items.Count == 1 ? "1 work item" : $"{items.Count} work items");
+        PrintAppliedFilters(ctx.Args, ctx.Project, ctx.Limit, items.Count, Console.Out);
         if (ctx.Args.Has("--summary"))
             PrintSummary(items, ctx.Limit, Console.Out);
         return 0;
+    }
+
+    /// <summary>Prints the effective query constraints so the selection is visible to the user.</summary>
+    public static void PrintAppliedFilters(Args args, string? project, int? limit, int count, TextWriter writer)
+    {
+        var filter = Filter(args);
+        writer.WriteLine();
+        writer.WriteLine("Filters applied:");
+        writer.WriteLine($"  Project:     {project ?? "All accessible projects"}");
+        writer.WriteLine($"  Assigned to: {filter.AssignedTo ?? (filter.Everyone ? "Everyone" : "@Me (default)")}");
+        writer.WriteLine($"  State:       {(filter.States.Count > 0 ? string.Join(", ", filter.States) : "Open (default; excludes Closed, Done, Removed)")}");
+        if (filter.Types.Count > 0) writer.WriteLine($"  Type:        {string.Join(", ", filter.Types)}");
+        if (filter.Area is not null) writer.WriteLine($"  Area:        {filter.Area}");
+        if (filter.Iteration is not null) writer.WriteLine($"  Iteration:   {filter.Iteration}");
+        if (filter.Tags.Count > 0) writer.WriteLine($"  Tags:        {string.Join(", ", filter.Tags)}");
+        if (filter.TitleContains is not null) writer.WriteLine($"  Title:       contains {filter.TitleContains}");
+        if (filter.Contains is not null) writer.WriteLine($"  Content:     contains {filter.Contains}");
+        if (filter.Wiql is not null) writer.WriteLine($"  WIQL:        {filter.Wiql}");
+        writer.WriteLine(limit is > 0
+            ? $"  Limit:       {limit} ({(count >= limit ? "reached; more items may exist" : "not reached")})"
+            : "  Limit:       None");
     }
 
     /// <summary>Summarizes only the rows actually returned, not the number matching on the server.</summary>
@@ -77,6 +99,7 @@ public static partial class WorkItemCommands
         w.Id.ToString(),
         w.Field("System.WorkItemType"),
         w.Field("System.State"),
+        w.Field("System.AssignedTo"),
         w.Field("Microsoft.VSTS.Common.Priority"),
         w.Field("System.IterationPath"),
         DateTimeOffset.TryParse(w.Field("System.ChangedDate"), out var changed) ? changed.ToLocalTime().ToString("yyyy-MM-dd") : "",

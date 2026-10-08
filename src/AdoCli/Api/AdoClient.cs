@@ -179,7 +179,7 @@ public sealed class AdoClient
     static readonly string[] SummaryFields = ["System.Title", "System.WorkItemType", "System.State"];
 
     // What `workitem list` shows besides the summary fields.
-    static readonly string[] ListFields = ["Microsoft.VSTS.Common.Priority", "System.IterationPath", "System.ChangedDate"];
+    static readonly string[] ListFields = ["System.AssignedTo", "Microsoft.VSTS.Common.Priority", "System.IterationPath", "System.ChangedDate"];
 
     // WIQL string literals are single-quoted; a quote inside one is doubled.
     static string Literal(string value) => "'" + value.Replace("'", "''") + "'";

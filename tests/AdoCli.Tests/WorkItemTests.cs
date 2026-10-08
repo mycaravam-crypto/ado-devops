@@ -74,7 +74,7 @@ public class WorkItemTests
         var query = (string)JsonNode.Parse(stub.Requests[0].Body!)!["query"]!;
         Assert.Equal("SELECT [System.Id] FROM WorkItems WHERE [System.AssignedTo] = @Me AND [System.State] NOT IN ('Closed', 'Done', 'Removed')" +
             " AND [System.TeamProject] = @project ORDER BY [System.ChangedDate] DESC", query);
-        Assert.EndsWith("ids=7&fields=System.Title,System.WorkItemType,System.State,Microsoft.VSTS.Common.Priority," +
+        Assert.EndsWith("ids=7&fields=System.Title,System.WorkItemType,System.State,System.AssignedTo,Microsoft.VSTS.Common.Priority," +
             "System.IterationPath,System.ChangedDate&errorPolicy=omit&api-version=5.0", stub.Requests[1].Url);
     }
 
@@ -210,6 +210,42 @@ public class WorkItemTests
     }
 
     [Fact]
+    public void ListRowIncludesAssigneeDisplayName()
+    {
+        var item = System.Text.Json.JsonSerializer.Deserialize<WorkItem>(
+            """{"id":10,"fields":{"System.Title":"Task","System.AssignedTo":{"displayName":"Jane Doe"}}}""",
+            Json.Options)!;
+        Assert.Equal("Jane Doe", WorkItemCommands.ListRow(item)[3]);
+    }
+
+    [Theory]
+    [InlineData(false, "@Me (default)", "Open (default")]
+    [InlineData(true, "Everyone", "Open (default")]
+    public void AppliedFiltersExplainDefaultsAndAll(bool all, string assignee, string state)
+    {
+        var a = Args.Parse(all ? ["workitem", "list", "--all"] : ["workitem", "list"]);
+        using var writer = new StringWriter();
+        WorkItemCommands.PrintAppliedFilters(a, "Platform", 200, 200, writer);
+        Assert.Contains(assignee, writer.ToString());
+        Assert.Contains(state, writer.ToString());
+        Assert.Contains("reached; more items may exist", writer.ToString());
+        Assert.Contains("Project:     Platform", writer.ToString());
+    }
+
+    [Fact]
+    public void AppliedFiltersExplainExplicitAssigneeAndAllStates()
+    {
+        var a = Args.Parse(["workitem", "list", "--all", "--assigned-to", "jane@example.com",
+            "--state", "any", "--type", "Bug"]);
+        using var writer = new StringWriter();
+        WorkItemCommands.PrintAppliedFilters(a, null, null, 0, writer);
+        Assert.Contains("Assigned to: jane@example.com", writer.ToString());
+        Assert.Contains("State:       any", writer.ToString());
+        Assert.Contains("Type:        Bug", writer.ToString());
+        Assert.Contains("Limit:       None", writer.ToString());
+    }
+
+    [Fact]
     public void ListRowShowsDetails()
     {
         var w = System.Text.Json.JsonSerializer.Deserialize<WorkItem>("""
@@ -218,7 +254,7 @@ public class WorkItemTests
             """, Json.Options)!;
 
         var expectedDate = DateTimeOffset.Parse("2026-10-05T12:00:00Z").ToLocalTime().ToString("yyyy-MM-dd");
-        Assert.Equal(["4711", "Bug", "Active", "2", "Platform\\Sprint 42", expectedDate, "Improve"], WorkItemCommands.ListRow(w));
+        Assert.Equal(["4711", "Bug", "Active", "", "2", "Platform\\Sprint 42", expectedDate, "Improve"], WorkItemCommands.ListRow(w));
     }
 
     [Fact]
@@ -226,7 +262,7 @@ public class WorkItemTests
     {
         var w = new WorkItem(1, []);
 
-        Assert.Equal(["1", "", "", "", "", "", ""], WorkItemCommands.ListRow(w));
+        Assert.Equal(["1", "", "", "", "", "", "", ""], WorkItemCommands.ListRow(w));
     }
 
     [Fact]

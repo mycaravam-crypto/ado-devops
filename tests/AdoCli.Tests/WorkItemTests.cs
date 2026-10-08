@@ -158,6 +158,58 @@ public class WorkItemTests
     }
 
     [Fact]
+    public void SummaryAggregatesReturnedItemsAndMarksLimitWithoutClaimingExactTotal()
+    {
+        var items = new List<WorkItem>
+        {
+            new(1, new() { ["System.WorkItemType"] = Str("Bug"), ["System.State"] = Str("Active"),
+                ["Microsoft.VSTS.Common.Priority"] = Str("1") }),
+            new(2, new() { ["System.WorkItemType"] = Str("Bug"), ["System.State"] = Str("Resolved"),
+                ["Microsoft.VSTS.Common.Priority"] = Str("2") }),
+            new(3, new() { ["System.WorkItemType"] = Str("Task"), ["System.State"] = Str("Active"),
+                ["Microsoft.VSTS.Common.Priority"] = Str("2") }),
+        };
+        using var writer = new StringWriter();
+        WorkItemCommands.PrintSummary(items, 3, writer);
+        var output = writer.ToString();
+        Assert.Contains("limit reached; more may exist", output);
+        Assert.Contains("By type:", output);
+        Assert.Contains("Bug                2", output);
+        Assert.Contains("By state:", output);
+        Assert.Contains("Active             2", output);
+        Assert.Contains("By priority:", output);
+        Assert.Contains("P2                 2", output);
+    }
+
+    [Fact]
+    public void SummaryHandlesZeroItemsAndMissingFields()
+    {
+        using var empty = new StringWriter();
+        WorkItemCommands.PrintSummary([], null, empty);
+        Assert.Contains("Showing 0 items.", empty.ToString());
+        Assert.Contains("(none)", empty.ToString());
+        using var missing = new StringWriter();
+        WorkItemCommands.PrintSummary([new WorkItem(1, [])], null, missing);
+        Assert.Contains("Unknown", missing.ToString());
+        Assert.DoesNotContain("limit reached", missing.ToString());
+    }
+
+    [Fact]
+    public async Task SummaryFlagAddsBreakdownOnlyToTextOutput()
+    {
+        var stub = new StubHandler(HttpStatusCode.OK, """{"workItems":[]}""");
+        var original = Console.Out;
+        using var writer = new StringWriter();
+        try
+        {
+            Console.SetOut(writer);
+            Assert.Equal(0, await WorkItemCommands.ListAsync(Ctx(stub, "workitem", "list", "--summary")));
+        }
+        finally { Console.SetOut(original); }
+        Assert.Contains("By priority:", writer.ToString());
+    }
+
+    [Fact]
     public void ListRowShowsDetails()
     {
         var w = System.Text.Json.JsonSerializer.Deserialize<WorkItem>("""

@@ -24,7 +24,36 @@ public static partial class WorkItemCommands
         Output.Table(["ID", "TYPE", "STATE", "PRI", "ITERATION", "CHANGED", "TITLE"], items.Select(ListRow));
         Console.WriteLine();
         Console.WriteLine(items.Count == 1 ? "1 work item" : $"{items.Count} work items");
+        if (ctx.Args.Has("--summary"))
+            PrintSummary(items, ctx.Limit, Console.Out);
         return 0;
+    }
+
+    /// <summary>Summarizes only the rows actually returned, not the number matching on the server.</summary>
+    public static void PrintSummary(IReadOnlyList<WorkItem> items, int? limit, TextWriter writer)
+    {
+        if (limit is > 0 && items.Count >= limit)
+            writer.WriteLine($"Showing {items.Count} items (limit reached; more may exist).");
+        else
+            writer.WriteLine($"Showing {items.Count} items.");
+
+        PrintBreakdown("By type", "System.WorkItemType");
+        PrintBreakdown("By state", "System.State");
+        PrintBreakdown("By priority", "Microsoft.VSTS.Common.Priority", priority: true);
+
+        void PrintBreakdown(string heading, string field, bool priority = false)
+        {
+            writer.WriteLine();
+            writer.WriteLine(heading + ":");
+            foreach (var group in items
+                .GroupBy(w => string.IsNullOrWhiteSpace(w.Field(field)) ? "Unknown" :
+                    priority ? "P" + w.Field(field) : w.Field(field))
+                .OrderByDescending(g => g.Count())
+                .ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase))
+                writer.WriteLine($"  {group.Key,-18} {group.Count()}");
+            if (items.Count == 0)
+                writer.WriteLine("  (none)");
+        }
     }
 
     /// <summary>The query of <c>workitem list</c> from its options.</summary>

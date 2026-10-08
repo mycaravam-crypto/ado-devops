@@ -184,7 +184,10 @@ public static class Help
         Usage:
           ado testplan list             list test plans of the project
           ado testplan show <id>        display plan metadata, suites and unique case count
-                                        (--json for structured output)
+              --with details           test cases, steps and expected results
+              --with results           execution outcomes from test runs
+              --with all               both details and execution outcomes
+              --json                    structured output
           ado testplan export <id>      write the plan's suites and test cases, with their steps,
                                         as JSON to stdout
               --output <file>           write to this file instead

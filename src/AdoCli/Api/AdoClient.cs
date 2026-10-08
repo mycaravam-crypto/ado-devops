@@ -207,15 +207,46 @@ public sealed class AdoClient
     public Task<WorkItem> CreateWorkItemAsync(string project, string type, IReadOnlyDictionary<string, string> fields) =>
         SendAsync<WorkItem>(HttpMethod.Post, Url(project, $"wit/workitems/${Uri.EscapeDataString(type)}"), FieldPatch(fields), JsonPatch);
 
-    /// <summary>Sets the given fields of a work item; fields not listed stay as they are.</summary>
-    public Task<WorkItem> UpdateWorkItemAsync(int id, IReadOnlyDictionary<string, string> fields) =>
-        SendAsync<WorkItem>(HttpMethod.Patch, Url(null, $"wit/workitems/{id}"), FieldPatch(fields), JsonPatch);
+    /// <summary>
+    /// Sets the given fields of a work item; fields not listed stay as they are. With <paramref name="expectedRev"/> the
+    /// server refuses the update if the work item is no longer at that revision.
+    /// </summary>
+    public Task<WorkItem> UpdateWorkItemAsync(int id, IReadOnlyDictionary<string, string> fields, int? expectedRev = null)
+    {
+        object[] patch = FieldPatch(fields);
+        if (expectedRev is { } rev)
+            patch = [new { op = "test", path = "/rev", value = rev }, .. patch];
+        return SendAsync<WorkItem>(HttpMethod.Patch, Url(null, $"wit/workitems/{id}"), patch, JsonPatch);
+    }
+
+    /// <summary>A work item as it was at revision <paramref name="rev"/>, with every field it had then.</summary>
+    public Task<WorkItem> GetWorkItemRevisionAsync(int id, int rev) =>
+        SendAsync<WorkItem>(HttpMethod.Get, Url(null, $"wit/workitems/{id}/revisions/{rev}"));
 
     const string JsonPatch = "application/json-patch+json";
 
     // "add" on a field sets it, whether or not it has a value yet.
-    static object FieldPatch(IReadOnlyDictionary<string, string> fields) =>
-        fields.Select(f => new { op = "add", path = "/fields/" + f.Key, value = f.Value }).ToArray();
+    static object[] FieldPatch(IReadOnlyDictionary<string, string> fields) =>
+        fields.Select(f => (object)new { op = "add", path = "/fields/" + f.Key, value = f.Value }).ToArray();
+
+    // Test plans use the "test" area, which is released (not preview) from api-version 5.0 and still served by
+    // Azure DevOps Server 2020 (Dev18) and later, so the one configured version works for them too.
+
+    /// <summary>Test plans of the project; all of them unless <paramref name="limit"/> is set.</summary>
+    public Task<List<TestPlan>> GetTestPlansAsync(string project, int? limit = null) =>
+        PageAsync<TestPlan>(project, "test/plans", "", limit);
+
+    public Task<TestPlan> GetTestPlanAsync(string project, int planId) =>
+        SendAsync<TestPlan>(HttpMethod.Get, Url(project, $"test/plans/{planId}"));
+
+    /// <summary>Every suite of the plan, the root suite included, flat; each names its parent.</summary>
+    public Task<List<TestSuite>> GetTestSuitesAsync(string project, int planId) =>
+        PageAsync<TestSuite>(project, $"test/plans/{planId}/suites", "", null);
+
+    /// <summary>The ids of the test cases in a suite, in the order the server keeps them.</summary>
+    public async Task<List<int>> GetSuiteTestCaseIdsAsync(string project, int planId, int suiteId) =>
+        (await SendAsync<ListResponse<SuiteTestCase>>(HttpMethod.Get, Url(project, $"test/plans/{planId}/suites/{suiteId}/testcases")))
+            .Value.Select(c => c.TestCase.Id).ToList();
 
     /// <summary>Builds of the project, most recently queued first; all of them unless <paramref name="limit"/> is set.</summary>
     public async Task<List<Build>> GetBuildsAsync(string project, int? limit = null)
@@ -249,7 +280,8 @@ public sealed class AdoClient
         while (limit is null || all.Count < limit)
         {
             var top = Math.Min(pageSize, limit - all.Count ?? pageSize);
-            var page = (await SendAsync<ListResponse<T>>(HttpMethod.Get, Url(project, path, $"{query}&$top={top}&$skip={all.Count}"))).Value;
+            var paging = $"$top={top}&$skip={all.Count}";
+            var page = (await SendAsync<ListResponse<T>>(HttpMethod.Get, Url(project, path, query.Length > 0 ? $"{query}&{paging}" : paging))).Value;
             all.AddRange(page);
             if (page.Count < top)
                 break;
@@ -302,7 +334,8 @@ public sealed class AdoClient
             403 => new($"permission denied{detail}", AdoException.Permission),
             404 => new($"not found{detail}", AdoException.NotFound),
             407 => new(Proxy.AuthRequired),
-            409 => new($"conflict{detail}", AdoException.Conflict),
+            // 412: a JSON Patch "test" operation failed, e.g. the work item is no longer at the expected revision.
+            409 or 412 => new($"conflict{detail}", AdoException.Conflict),
             429 => new("rate limited by Azure DevOps Server; try again later"),
             >= 500 => new($"Azure DevOps Server error ({code}){detail}"),
             _ => new($"request failed ({code}){detail}"),

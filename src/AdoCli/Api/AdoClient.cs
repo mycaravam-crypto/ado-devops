@@ -249,6 +249,19 @@ public sealed class AdoClient
         (await SendAsync<ListResponse<SuiteTestCase>>(HttpMethod.Get, Url(project, $"test/plans/{planId}/suites/{suiteId}/testcases", apiVersion: LegacyTestApiVersion)))
             .Value.Select(c => c.TestCase.Id).ToList();
 
+    /// <summary>Test runs for a plan, ordered newest first for latest-result selection.</summary>
+    public async Task<List<TestRunInfo>> GetTestRunsAsync(string project, int planId)
+    {
+        var runs = await PageAsync<TestRunInfo>(project, "test/runs", $"planId={planId}", null,
+            apiVersion: LegacyTestApiVersion);
+        return runs.OrderByDescending(r => r.CompletedDate ?? r.StartedDate ?? DateTimeOffset.MinValue)
+            .ThenByDescending(r => r.Id).ToList();
+    }
+
+    public Task<List<TestResultInfo>> GetRunResultsAsync(string project, int runId) =>
+        PageAsync<TestResultInfo>(project, $"test/runs/{runId}/results", "", null,
+            apiVersion: LegacyTestApiVersion);
+
     /// <summary>Builds of the project, most recently queued first; all of them unless <paramref name="limit"/> is set.</summary>
     public async Task<List<Build>> GetBuildsAsync(string project, int? limit = null)
     {

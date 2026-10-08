@@ -1,6 +1,8 @@
 namespace AdoCli.Cli;
 
 using AdoCli.Api;
+using System.Net;
+using System.Text.RegularExpressions;
 
 /// <summary>ado testplan list / export / import: test plans as one JSON file to edit outside Azure DevOps and import again.</summary>
 public static class TestPlanCommands
@@ -49,13 +51,67 @@ public static class TestPlanCommands
     public sealed record TestPlanOverview(int Id, string Name, string? State, string? Iteration,
         int? RootSuiteId, List<TestSuiteOverview> Suites, int UniqueTestCaseCount);
 
+    public sealed record CaseDetail(int Id, string Title, string State, IReadOnlyList<TestStep> Steps);
+    public sealed record ExecutionResult(int TestCaseId, int RunId, string Outcome, string? State, string? ErrorMessage);
+    public sealed record DetailedOverview(TestPlanOverview Plan, IReadOnlyList<SuiteInfo> Suites,
+        IReadOnlyList<CaseDetail>? TestCases, IReadOnlyList<ExecutionResult>? Results);
+
+    /// <summary>Fetches details only once per unique case. Results are separate run outcomes, never expected results.</summary>
+    public static async Task<DetailedOverview> GetDetailedAsync(AdoClient client, string project, int id, string mode)
+    {
+        var plan = await client.GetTestPlanAsync(project, id);
+        var suites = new List<SuiteInfo>();
+        foreach (var suite in (await client.GetTestSuitesAsync(project, id)).OrderBy(s => s.Id))
+            suites.Add(new(suite.Id, suite.Name, suite.SuiteType, suite.Parent?.Id,
+                await client.GetSuiteTestCaseIdsAsync(project, id, suite.Id)));
+        var overview = new TestPlanOverview(plan.Id, plan.Name, plan.State, plan.Iteration, plan.RootSuite?.Id,
+            suites.Select(s => new TestSuiteOverview(s.Id, s.Name, s.SuiteType, s.ParentId,
+                s.TestCaseIds.Distinct().Count())).ToList(),
+            suites.SelectMany(s => s.TestCaseIds).Distinct().Count());
+        var ids = suites.SelectMany(s => s.TestCaseIds).Distinct().Order().ToArray();
+        IReadOnlyList<CaseDetail>? cases = null;
+        if (mode is "details" or "all")
+        {
+            var items = await client.GetWorkItemsAsync(ids, [Title, "System.State", TestSteps.Field]);
+            cases = items.OrderBy(w => w.Id).Select(w =>
+                new CaseDetail(w.Id, w.Field(Title), w.Field("System.State"), StepsOf(w).Steps)).ToList();
+        }
+        IReadOnlyList<ExecutionResult>? results = null;
+        if (mode is "results" or "all")
+        {
+            var latest = new Dictionary<int, ExecutionResult>();
+            // Runs are returned newest-first. Keep the first result encountered for each test case.
+            foreach (var run in await client.GetTestRunsAsync(project, id))
+                foreach (var result in await client.GetRunResultsAsync(project, run.Id))
+                {
+                    if (result.TestCase?.Id is not { } caseId || !ids.Contains(caseId) || latest.ContainsKey(caseId))
+                        continue;
+                    latest.Add(caseId, new(caseId, run.Id, result.Outcome ?? "Unknown",
+                        result.State, result.ErrorMessage));
+                }
+            results = latest.Values.OrderBy(r => r.TestCaseId).ToList();
+        }
+        return new(overview, suites, cases, results);
+    }
+
+    static string Plain(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return "-";
+        return Regex.Replace(WebUtility.HtmlDecode(Regex.Replace(value, "<[^>]*>", " ")), @"\s+", " ").Trim();
+    }
+
     /// <summary>ado testplan show &lt;id&gt;: plan metadata, hierarchy and distinct test-case count.</summary>
     public static async Task<int> ShowAsync(Context ctx)
     {
-        var plan = await GetOverviewAsync(ctx.Client, ctx.RequireProject(),
-            ctx.Id("testplan show <id>"));
+        var mode = ctx.Args.Get("--with");
+        if (mode is not null && mode is not ("details" or "results" or "all"))
+            throw AdoException.Usage("--with must be details, results or all (example: ado testplan show 12 --with details)");
+        var project = ctx.RequireProject();
+        var id = ctx.Id("testplan show <id> [--with details|results|all]");
+        var detailed = mode is not null ? await GetDetailedAsync(ctx.Client, project, id, mode) : null;
+        var plan = detailed?.Plan ?? await GetOverviewAsync(ctx.Client, project, id);
         if (ctx.Json)
-            return Output.WriteJson(plan);
+            return Output.WriteJson((object?)detailed ?? plan);
 
         Console.WriteLine($"Test Plan #{plan.Id}: {plan.Name}");
         Console.WriteLine($"State:      {plan.State ?? ""}");
@@ -76,6 +132,33 @@ public static class TestPlanCommands
             Print(suite, 0);
         foreach (var suite in plan.Suites)
             Print(suite, 0);
+        if (detailed is not null)
+        {
+            var cases = detailed.TestCases?.ToDictionary(c => c.Id);
+            var results = detailed.Results?.ToDictionary(r => r.TestCaseId);
+            foreach (var suite in detailed.Suites)
+            {
+                Console.WriteLine($"  Suite #{suite.Id}: {suite.Name}");
+                foreach (var idInSuite in suite.TestCaseIds.Distinct())
+                {
+                    if (cases is not null && cases.TryGetValue(idInSuite, out var testCase))
+                    {
+                        Console.WriteLine($"    Test Case #{testCase.Id}: {testCase.Title} [{testCase.State}]");
+                        for (var i = 0; i < testCase.Steps.Count; i++)
+                        {
+                            var step = testCase.Steps[i];
+                            Console.WriteLine($"      Step {i + 1}: {(step.SharedStepsId is { } shared ? $"Shared Steps #{shared}" : Plain(step.Action))}");
+                            if (step.SharedStepsId is null)
+                                Console.WriteLine($"        Expected: {Plain(step.ExpectedResult)}");
+                        }
+                    }
+                    if (results is not null)
+                        Console.WriteLine(results.TryGetValue(idInSuite, out var result)
+                            ? $"    Test Case #{idInSuite}: Actual {result.Outcome} (run #{result.RunId})"
+                            : $"    Test Case #{idInSuite}: Actual no execution result found");
+                }
+            }
+        }
         Console.WriteLine();
         Console.WriteLine($"Suites: {plan.Suites.Count}; unique test cases: {plan.UniqueTestCaseCount}");
         Console.WriteLine($"Next: ado testplan export {plan.Id} --output plan.json");

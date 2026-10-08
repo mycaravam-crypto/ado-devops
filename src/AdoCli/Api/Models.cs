@@ -118,3 +118,6 @@ public sealed record TestPlan(int Id, string Name, string? State, string? Iterat
 public sealed record TestSuite(int Id, string Name, string? SuiteType, IdRef? Parent);
 
 public sealed record SuiteTestCase(IdRef TestCase);
+
+public sealed record TestRunInfo(int Id, DateTimeOffset? StartedDate, DateTimeOffset? CompletedDate);
+public sealed record TestResultInfo(int Id, IdRef? TestCase, string? Outcome, string? State, string? ErrorMessage);

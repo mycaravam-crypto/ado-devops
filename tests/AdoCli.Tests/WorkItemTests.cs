@@ -104,6 +104,59 @@ public class WorkItemTests
         Assert.Contains("[System.WorkItemType] IN ('Bug', 'User Story')", query);
     }
 
+    [Theory]
+    [InlineData(0, "0 work items")]
+    [InlineData(1, "1 work item")]
+    [InlineData(2, "2 work items")]
+    public async Task ListHasFinalResultCount(int count, string footer)
+    {
+        var refs = string.Join(",", Enumerable.Range(1, count).Select(id => $"{{\"id\":{id}}}"));
+        var items = string.Join(",", Enumerable.Range(1, count).Select(id =>
+            $"{{\"id\":{id},\"fields\":{{\"System.Title\":\"Example {id}\"}}}}"));
+        var stub = new StubHandler(n => n == 0
+            ? StubHandler.Json($"{{\"workItems\":[{refs}]}}")
+            : StubHandler.Json($"{{\"value\":[{items}]}}"));
+        var original = Console.Out;
+        using var writer = new StringWriter();
+        try
+        {
+            Console.SetOut(writer);
+            Assert.Equal(0, await WorkItemCommands.ListAsync(Ctx(stub, "workitem", "list")));
+        }
+        finally { Console.SetOut(original); }
+        Assert.EndsWith(footer + Environment.NewLine, writer.ToString());
+        Assert.Contains("ID", writer.ToString());
+    }
+
+    [Fact]
+    public async Task ListJsonAndIdsDoNotHaveHumanReadableFooter()
+    {
+        var jsonStub = new StubHandler(n => n == 0
+            ? StubHandler.Json("""{"workItems":[{"id":7}]}""")
+            : StubHandler.Json("""{"value":[{"id":7,"fields":{"System.Title":"Example"}}]}"""));
+        var original = Console.Out;
+        using var writer = new StringWriter();
+        try
+        {
+            Console.SetOut(writer);
+            Assert.Equal(0, await WorkItemCommands.ListAsync(Ctx(jsonStub, "workitem", "list", "--json")));
+        }
+        finally { Console.SetOut(original); }
+        var data = JsonNode.Parse(writer.ToString())!.AsArray();
+        Assert.Single(data);
+        Assert.Equal(7, (int)data[0]!["id"]!);
+
+        var idsStub = new StubHandler(HttpStatusCode.OK, """{"workItems":[{"id":7}]}""");
+        using var idsWriter = new StringWriter();
+        try
+        {
+            Console.SetOut(idsWriter);
+            Assert.Equal(0, await WorkItemCommands.ListAsync(Ctx(idsStub, "workitem", "list", "--ids")));
+        }
+        finally { Console.SetOut(original); }
+        Assert.Equal("7" + Environment.NewLine, idsWriter.ToString());
+    }
+
     [Fact]
     public void ListRowShowsDetails()
     {

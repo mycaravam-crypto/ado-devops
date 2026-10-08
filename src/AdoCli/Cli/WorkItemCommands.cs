@@ -22,6 +22,8 @@ public static partial class WorkItemCommands
             return Output.WriteJson(items);
 
         Output.Table(["ID", "TYPE", "STATE", "PRI", "ITERATION", "CHANGED", "TITLE"], items.Select(ListRow));
+        Console.WriteLine();
+        Console.WriteLine(items.Count == 1 ? "1 work item" : $"{items.Count} work items");
         return 0;
     }
 

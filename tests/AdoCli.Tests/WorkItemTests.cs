@@ -74,7 +74,7 @@ public class WorkItemTests
         var query = (string)JsonNode.Parse(stub.Requests[0].Body!)!["query"]!;
         Assert.Equal("SELECT [System.Id] FROM WorkItems WHERE [System.AssignedTo] = @Me AND [System.State] NOT IN ('Closed', 'Done', 'Removed')" +
             " AND [System.TeamProject] = @project ORDER BY [System.ChangedDate] DESC", query);
-        Assert.EndsWith("ids=7&fields=System.Title,System.WorkItemType,System.State,Microsoft.VSTS.Common.Priority," +
+        Assert.EndsWith("ids=7&fields=System.Title,System.WorkItemType,System.State,System.AssignedTo,Microsoft.VSTS.Common.Priority," +
             "System.IterationPath,System.ChangedDate&errorPolicy=omit&api-version=5.0", stub.Requests[1].Url);
     }
 

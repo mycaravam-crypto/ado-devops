@@ -1,5 +1,6 @@
 namespace AdoCli.Cli;
 
+using System.Diagnostics;
 using AdoCli.Api;
 
 public static class BuildCommands
@@ -7,6 +8,7 @@ public static class BuildCommands
     /// <summary>ado build list: builds of the current project, most recently queued first; all unless --limit is given.</summary>
     public static async Task<int> ListAsync(Context ctx)
     {
+        var sw = Stopwatch.StartNew();
         var builds = await ctx.Client.GetBuildsAsync(ctx.RequireProject(), ctx.Limit);
         if (ctx.Json)
             return Output.WriteJson(builds);
@@ -15,6 +17,7 @@ public static class BuildCommands
         {
             b.Id.ToString(), b.Definition.Name, Output.Branch(b.SourceBranch), Output.Status(b.Result ?? b.Status),
         }));
+        Output.WriteSummary(builds.Count, "build", ctx.Limit, [], sw.Elapsed);
         return 0;
     }
 

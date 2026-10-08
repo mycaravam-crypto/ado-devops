@@ -1,5 +1,6 @@
 namespace AdoCli.Cli;
 
+using System.Diagnostics;
 using AdoCli.Api;
 using AdoCli.Git;
 
@@ -8,13 +9,27 @@ public static class PrCommands
     /// <summary>ado pr list: PRs of the repository (or project), active unless --status says otherwise; --mine keeps your own, --limit caps the count.</summary>
     public static async Task<int> ListAsync(Context ctx)
     {
-        Guid? creator = ctx.Args.Has("--mine") ? (await ctx.Client.GetConnectionDataAsync()).AuthenticatedUser.Id : null;
-        var prs = await ctx.Client.GetPullRequestsAsync(ctx.RequireProject(), ctx.Repo, ctx.Args.Get("--status") ?? "active", creator, ctx.Limit);
+        var sw = Stopwatch.StartNew();
+        var mine = ctx.Args.Has("--mine");
+        var status = ctx.Args.Get("--status") ?? "active";
+        Guid? creator = mine ? (await ctx.Client.GetConnectionDataAsync()).AuthenticatedUser.Id : null;
+        var prs = await ctx.Client.GetPullRequestsAsync(ctx.RequireProject(), ctx.Repo, status, creator, ctx.Limit);
         if (ctx.Json)
             return Output.WriteJson(prs);
 
         Output.Table(["ID", "TITLE", "AUTHOR", "TARGET", "STATUS"], prs.Select(ListRow));
+        Output.WriteSummary(prs.Count, "pull request", ctx.Limit, Describe(status, mine, ctx.Repo), sw.Elapsed);
         return 0;
+    }
+
+    /// <summary>The query of <c>pr list</c> in words, for the summary line.</summary>
+    public static List<string> Describe(string status, bool mine, string? repo)
+    {
+        var parts = new List<string> { status == "all" ? "any status" : status };
+        if (mine)
+            parts.Add("created by you");
+        parts.Add(repo is null ? "all repositories" : $"repository {repo}");
+        return parts;
     }
 
     /// <summary>One row of <c>pr list</c>; status stays last so its color codes never skew the padding.</summary>

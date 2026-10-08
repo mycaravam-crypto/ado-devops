@@ -79,7 +79,30 @@ public static class Output
         return color is null || !UseColor ? text : $"\e[{color}m{text}\e[0m";
     }
 
-    static bool UseColor => !Console.IsOutputRedirected && Environment.GetEnvironmentVariable("NO_COLOR") is null;
+    /// <summary>
+    /// The line after a list's table: how many items were found, the <paramref name="filters"/> in effect, whether
+    /// <c>--limit</c> may have cut the list short and how long it took. E.g. "450 work items · open only · all matching · 1.8s".
+    /// </summary>
+    public static string Summary(int count, string noun, int? limit, IEnumerable<string> filters, TimeSpan elapsed)
+    {
+        var parts = new List<string> { $"{count} {noun}{(count == 1 ? "" : "s")}" };
+        parts.AddRange(filters);
+        parts.Add(limit is { } n && count >= n ? $"limited by --limit {n}" : "all matching");
+        parts.Add($"{elapsed.TotalSeconds:0.0}s");
+        return string.Join(" · ", parts);
+    }
+
+    /// <summary>
+    /// Writes <see cref="Summary"/> to stderr after a blank line, only when stdout is a terminal: piped tables,
+    /// <c>--ids</c> and <c>--json</c> output stay exactly as they are.
+    /// </summary>
+    public static void WriteSummary(int count, string noun, int? limit, IEnumerable<string> filters, TimeSpan elapsed)
+    {
+        if (!Console.IsOutputRedirected)
+            Console.Error.WriteLine("\n" + Summary(count, noun, limit, filters, elapsed));
+    }
+
+    static bool UseColor =>!Console.IsOutputRedirected && Environment.GetEnvironmentVariable("NO_COLOR") is null;
 
     public static string Truncate(string s, int max) => s.Length <= max ? s : s[..(max - 1)] + "…";
 

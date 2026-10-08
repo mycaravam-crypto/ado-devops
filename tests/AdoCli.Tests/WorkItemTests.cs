@@ -386,4 +386,32 @@ public class WorkItemTests
         Assert.Equal(AdoException.InvalidUsage, e.ExitCode);
         Assert.Empty(stub.Requests);
     }
+
+    [Fact]
+    public void SummaryDescribesTheDefaultQuery()
+    {
+        var f = WorkItemCommands.Filter(Args.Parse(["workitem", "list"]));
+
+        Assert.Equal("450 work items · assigned to you · open only · all matching · 1.8s",
+            Output.Summary(450, "work item", null, WorkItemCommands.Describe(f), TimeSpan.FromSeconds(1.84)));
+    }
+
+    [Fact]
+    public void SummaryDescribesEveryFilter()
+    {
+        var a = Args.Parse(["workitem", "list", "--all", "--state", "Active,New", "--type", "Bug", "--area", "Platform\\Import",
+            "--iteration", "Sprint 42", "--tag", "ui", "--title-contains", "abc", "--contains", "x", "--wiql", "[A] = 1"]);
+
+        Assert.Equal(["everyone's", "state Active, New", "type Bug", "area Platform\\Import", "iteration Sprint 42", "tagged ui",
+            "title contains 'abc'", "'x' in title or description", "custom WIQL"], WorkItemCommands.Describe(WorkItemCommands.Filter(a)));
+        Assert.Equal(["assigned to Jane", "any state"],
+            WorkItemCommands.Describe(WorkItemCommands.Filter(Args.Parse(["workitem", "list", "--assigned-to", "Jane", "--state", "any"]))));
+    }
+
+    [Fact]
+    public void SummarySaysWhenLimitCutTheListShort()
+    {
+        Assert.Equal("10 work items · limited by --limit 10 · 0.3s", Output.Summary(10, "work item", 10, [], TimeSpan.FromSeconds(0.3)));
+        Assert.Equal("1 work item · all matching · 0.3s", Output.Summary(1, "work item", 10, [], TimeSpan.FromSeconds(0.3)));
+    }
 }

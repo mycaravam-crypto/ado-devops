@@ -37,6 +37,7 @@ public static class Help
           --ca-cert <file>  also trust the CA certificate(s) in this PEM file;
                             --ca-cert none overrides a saved one
           --limit <n>       list commands fetch at most n items (default: all)
+                            and, in a terminal, end with a count and the filters used
           --proxy <url>     use this HTTP(S) or SOCKS proxy; --proxy none connects
                             directly (default: HTTPS_PROXY or system settings)
           --help, -h        show help

@@ -52,6 +52,15 @@ export ADO_SERVER="https://tfs.company.local/tfs/DefaultCollection"
 export ADO_PROJECT="Platform"
 ```
 
+In a terminal, every `list` command ends with a summary line: how many items it found, the filters in effect, whether
+`--limit` cut the list short, and how long it took:
+
+```
+450 work items · assigned to you · open only · all matching · 1.8s
+```
+
+The summary goes to stderr, and only when stdout is a terminal, so piped tables, `--ids` and `--json` stay unchanged.
+
 In scripts, use the exit code and the JSON output:
 
 ```bash

@@ -159,4 +159,11 @@ public class PullRequestTests
 
     static void AssertJson(string expected, string? actual) =>
         Assert.True(JsonNode.DeepEquals(JsonNode.Parse(expected), JsonNode.Parse(actual!)), actual);
+
+    [Fact]
+    public void SummaryDescribesTheQuery()
+    {
+        Assert.Equal(["active", "all repositories"], PrCommands.Describe("active", mine: false, repo: null));
+        Assert.Equal(["any status", "created by you", "repository api"], PrCommands.Describe("all", mine: true, repo: "api"));
+    }
 }

@@ -1,5 +1,6 @@
 namespace AdoCli.Cli;
 
+using System.Diagnostics;
 using AdoCli.Api;
 
 /// <summary>ado testplan list / export / import: test plans as one JSON file to edit outside Azure DevOps and import again.</summary>
@@ -19,10 +20,12 @@ public static class TestPlanCommands
     /// <summary>ado testplan list: id, name, state and iteration of each test plan of the project.</summary>
     public static async Task<int> ListAsync(Context ctx)
     {
+        var sw = Stopwatch.StartNew();
         var plans = await ctx.Client.GetTestPlansAsync(ctx.RequireProject(), ctx.Limit);
         if (ctx.Json)
             return Output.WriteJson(plans);
         Output.Table(["ID", "STATE", "ITERATION", "NAME"], plans.Select(p => new[] { p.Id.ToString(), p.State ?? "", p.Iteration ?? "", p.Name }));
+        Output.WriteSummary(plans.Count, "test plan", ctx.Limit, [], sw.Elapsed);
         return 0;
     }
 

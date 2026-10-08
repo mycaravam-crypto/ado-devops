@@ -1,5 +1,6 @@
 namespace AdoCli.Cli;
 
+using System.Diagnostics;
 using System.Net;
 using System.Text.RegularExpressions;
 using AdoCli.Api;
@@ -17,12 +18,44 @@ public static partial class WorkItemCommands
             return 0;
         }
 
-        var items = await ctx.Client.QueryWorkItemsAsync(ctx.Project, Filter(ctx.Args), ctx.Limit);
+        var filter = Filter(ctx.Args);
+        var sw = Stopwatch.StartNew();
+        var items = await ctx.Client.QueryWorkItemsAsync(ctx.Project, filter, ctx.Limit);
         if (ctx.Json)
             return Output.WriteJson(items);
 
         Output.Table(["ID", "TYPE", "STATE", "PRI", "ITERATION", "CHANGED", "TITLE"], items.Select(ListRow));
+        Output.WriteSummary(items.Count, "work item", ctx.Limit, Describe(filter), sw.Elapsed);
         return 0;
+    }
+
+    /// <summary>The conditions of <paramref name="f"/> in words, for the summary line; mirrors <see cref="AdoClient.Wiql"/>.</summary>
+    public static List<string> Describe(WorkItemFilter f)
+    {
+        var parts = new List<string>();
+        if (f.AssignedTo is { } who)
+            parts.Add(who.Equals("@me", StringComparison.OrdinalIgnoreCase) ? "assigned to you" : $"assigned to {who}");
+        else
+            parts.Add(f.Everyone ? "everyone's" : "assigned to you");
+        if (f.States.Any(s => s.Equals("any", StringComparison.OrdinalIgnoreCase)))
+            parts.Add("any state");
+        else
+            parts.Add(f.States.Count > 0 ? "state " + string.Join(", ", f.States) : "open only");
+        if (f.Types.Count > 0)
+            parts.Add("type " + string.Join(", ", f.Types));
+        if (f.Area is { } area)
+            parts.Add($"area {area}");
+        if (f.Iteration is { } iteration)
+            parts.Add($"iteration {iteration}");
+        if (f.Tags.Count > 0)
+            parts.Add("tagged " + string.Join(", ", f.Tags));
+        if (f.TitleContains is { } title)
+            parts.Add($"title contains '{title}'");
+        if (f.Contains is { } text)
+            parts.Add($"'{text}' in title or description");
+        if (f.Wiql is { Length: > 0 })
+            parts.Add("custom WIQL");
+        return parts;
     }
 
     /// <summary>The query of <c>workitem list</c> from its options.</summary>

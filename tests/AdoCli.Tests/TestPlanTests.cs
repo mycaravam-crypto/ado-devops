@@ -354,6 +354,49 @@ public class TestPlanTests
         Assert.Contains(server.Urls, url => url.Contains("/_apis/wit/workitems?") && url.EndsWith("api-version=6.0"));
     }
 
+    [Fact]
+    public async Task ShowSummarizesSuitesAndCountsSharedCasesOnlyOnce()
+    {
+        var server = new FakeServer("6.0");
+        var summary = await TestPlanCommands.GetOverviewAsync(server.Client, "Platform", 12);
+        Assert.Equal(12, summary.Id);
+        Assert.Equal(13, summary.RootSuiteId);
+        Assert.Equal(3, summary.Suites.Count);
+        Assert.Equal(3, summary.UniqueTestCaseCount);
+        Assert.Equal([13, 14, 15], summary.Suites.Select(s => s.Id));
+        Assert.Equal(13, summary.Suites[1].ParentId);
+        Assert.Contains(server.Urls, u => u.Contains("/_apis/test/plans/12/suites/14/testcases") && u.EndsWith("api-version=5.0"));
+        Assert.DoesNotContain(server.Urls, u => u.Contains("/_apis/wit/"));
+        Assert.Empty(server.Patches);
+    }
+
+    [Fact]
+    public async Task ShowMissingPlanReturnsNotFound()
+    {
+        var server = new FakeServer();
+        var error = await Assert.ThrowsAsync<AdoException>(() =>
+            TestPlanCommands.GetOverviewAsync(server.Client, "Platform", 99));
+        Assert.Equal(AdoException.NotFound, error.ExitCode);
+    }
+
+    [Fact]
+    public async Task ShowJsonIsValidWithoutAdditionalStdout()
+    {
+        var server = new FakeServer();
+        var original = Console.Out;
+        using var writer = new StringWriter();
+        try
+        {
+            Console.SetOut(writer);
+            Assert.Equal(0, await TestPlanCommands.ShowAsync(Ctx(server, "testplan", "show", "12", "--json")));
+        }
+        finally { Console.SetOut(original); }
+        var obj = JsonNode.Parse(writer.ToString())!;
+        Assert.Equal(12, (int)obj["id"]!);
+        Assert.Equal(3, (int)obj["uniqueTestCaseCount"]!);
+        Assert.Equal(3, obj["suites"]!.AsArray().Count);
+    }
+
     static (string, string, string) Op(JsonNode? op) => ((string)op!["op"]!, (string)op["path"]!, op["value"]!.ToJsonString());
 
     static Context Ctx(FakeServer server, params string[] argv) =>

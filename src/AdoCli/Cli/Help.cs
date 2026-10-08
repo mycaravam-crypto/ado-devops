@@ -16,7 +16,7 @@ public static class Help
           repo      list, show, clone, status
           pr        list, show, context, diff, checkout, create, approve, merge
           workitem  list, show, create, edit
-          testplan  list, export, import
+          testplan  list, show, export, import
           build     list, show, run
 
         Inside a cloned Azure DevOps repository, project and repository are detected
@@ -183,6 +183,8 @@ public static class Help
 
         Usage:
           ado testplan list             list test plans of the project
+          ado testplan show <id>        display plan metadata, suites and unique case count
+                                        (--json for structured output)
           ado testplan export <id>      write the plan's suites and test cases, with their steps,
                                         as JSON to stdout
               --output <file>           write to this file instead
@@ -197,6 +199,7 @@ public static class Help
 
         Examples:
           ado testplan list
+          ado testplan show 12 --json
           ado testplan export 12 --output plan.json
           ado testplan import plan.json --dry-run
           ado testplan import plan.json --yes

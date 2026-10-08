@@ -341,9 +341,12 @@ ado testplan import edited.json --yes
 ado testplan export 12 --output plan.json        # the new revisions, ready for the next edit
 ```
 
-The test plan commands use the `test` REST area, which is released in API version 5.0 and served by Azure DevOps
-Server 2019, 2020 (Dev18.M170) and 2022, so the default `apiVersion` works. The token needs the *Test management*
-read scope besides *Work items read & write*.
+The test plan commands use the legacy `test` REST area with **API version 5.0** on Azure DevOps Server
+2020 (Dev18.M170), even when `ADO_API_VERSION` or the configured global `apiVersion` is `6.0`.
+Other API areas (Git, Work Items and Builds) continue to use the globally configured version. This endpoint-specific
+version is intentional: Dev18.M170.8 can return HTTP 404 for `test/plans` with version 6.0, even though version 5.0
+works. No automatic fallback or retry occurs. The token needs the *Test management* read scope besides *Work items
+read & write*.
 
 ## Builds
 

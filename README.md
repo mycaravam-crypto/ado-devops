@@ -243,6 +243,9 @@ with an editor, `jq` or a script — and import the changes:
 ado testplan list                                 # id, state, iteration and name of each plan in the project
 ado testplan show 12                              # plan metadata, suite hierarchy, distinct test case count
 ado testplan show 12 --json                       # structured read-only summary
+ado testplan show 12 --with details              # suite cases, steps and expected results
+ado testplan show 12 --with results              # actual outcomes from test runs
+ado testplan show 12 --with all --json           # detailed machine-readable view
 ado testplan export 12 --output plan.json         # without --output: JSON on stdout
 ado testplan import plan.json --dry-run           # what would change; writes nothing
 ado testplan import plan.json                     # asks before updating several test cases (--yes skips that)
@@ -250,7 +253,7 @@ ado testplan import plan.json                     # asks before updating several
 
 `show` is read-only and fetches the plan, suites and their test case IDs, not work-item fields or test steps.
 Suites are shown in a stable hierarchy; test cases assigned to several suites count only once in the overall total.
-Use `export` when you need full test case content and steps.
+Use `export` when you need a portable edit/import document. In `show`, expected results are part of the test case definition; `--with results` instead reads actual outcomes from test runs. An absent run is not a passing test. All modes are read-only.
 
 ### The file
 

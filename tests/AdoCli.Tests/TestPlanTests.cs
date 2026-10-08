@@ -397,6 +397,54 @@ public class TestPlanTests
         Assert.Equal(3, obj["suites"]!.AsArray().Count);
     }
 
+    [Fact]
+    public async Task DetailsFetchCasesOnceAndKeepTheirSteps()
+    {
+        var server = new FakeServer("6.0");
+        var view = await TestPlanCommands.GetDetailedAsync(server.Client, "Platform", 12, "details");
+        Assert.Equal(3, view.Plan.UniqueTestCaseCount);
+        Assert.Equal(3, view.TestCases!.Count);
+        Assert.Equal(3, view.TestCases.Single(c => c.Id == 101).Steps.Count);
+        Assert.Null(view.Results);
+        Assert.Single(server.Urls.Where(u => u.Contains("/_apis/wit/workitems?")));
+        Assert.Empty(server.Patches);
+    }
+
+    [Fact]
+    public async Task ResultsAreActualRunOutcomesNotExpectedStepResults()
+    {
+        var server = new FakeServer("6.0");
+        var view = await TestPlanCommands.GetDetailedAsync(server.Client, "Platform", 12, "results");
+        Assert.Null(view.TestCases);
+        Assert.Single(view.Results!);
+        Assert.Equal("Failed", view.Results[0].Outcome);
+        Assert.Equal(101, view.Results[0].TestCaseId);
+        Assert.Equal(22, view.Results[0].RunId);
+        Assert.DoesNotContain(server.Urls, u => u.Contains("/_apis/wit/workitems?"));
+    }
+
+    [Fact]
+    public async Task AllIncludesDefinitionsAndRunOutcomes()
+    {
+        var server = new FakeServer();
+        var view = await TestPlanCommands.GetDetailedAsync(server.Client, "Platform", 12, "all");
+        Assert.NotNull(view.TestCases);
+        Assert.NotNull(view.Results);
+        Assert.Equal(3, view.TestCases!.Count);
+        Assert.Single(view.Results!);
+    }
+
+    [Fact]
+    public async Task ShowRejectsUnsupportedWithModeBeforeNetwork()
+    {
+        var server = new FakeServer();
+        var error = await Assert.ThrowsAsync<AdoException>(() =>
+            TestPlanCommands.ShowAsync(Ctx(server, "testplan", "show", "12", "--with", "everything")));
+        Assert.Equal(AdoException.InvalidUsage, error.ExitCode);
+        Assert.Contains("details, results or all", error.Message);
+        Assert.Empty(server.Urls);
+    }
+
     static (string, string, string) Op(JsonNode? op) => ((string)op!["op"]!, (string)op["path"]!, op["value"]!.ToJsonString());
 
     static Context Ctx(FakeServer server, params string[] argv) =>
@@ -469,6 +517,10 @@ public class TestPlanTests
                 ["platform", "_apis", "test", "plans"] => Json($"{{\"value\":[{plan}],\"count\":1}}"),
                 ["platform", "_apis", "test", "plans", "12"] => Json(plan),
                 ["platform", "_apis", "test", "plans", _] => Error(HttpStatusCode.NotFound, $"Test plan {path[4]} not found."),
+                ["platform", "_apis", "test", "runs"] =>
+                    Json("""{"value":[{"id":22,"completedDate":"2026-10-01T10:00:00Z"}]}"""),
+                ["platform", "_apis", "test", "runs", "22", "results"] =>
+                    Json("""{"value":[{"id":1,"testCase":{"id":"101"},"outcome":"Failed","state":"Completed","errorMessage":"Assertion failed"}]}"""),
                 ["platform", "_apis", "test", "plans", "12", "suites"] => Json("""
                     {"value":[{"id":13,"name":"Release 1","suiteType":"StaticTestSuite"},
                       {"id":14,"name":"Login","suiteType":"StaticTestSuite","parent":{"id":"13"}},

@@ -26,6 +26,62 @@ public static class TestPlanCommands
         return 0;
     }
 
+    /// <summary>Summarizes a test plan without downloading work-item fields or steps.</summary>
+    public static async Task<TestPlanOverview> GetOverviewAsync(AdoClient client, string project, int id)
+    {
+        var plan = await client.GetTestPlanAsync(project, id);
+        var suites = (await client.GetTestSuitesAsync(project, id))
+            .OrderBy(s => s.Id).ToList();
+        var views = new List<TestSuiteOverview>();
+        var allCases = new HashSet<int>();
+        foreach (var suite in suites)
+        {
+            var ids = await client.GetSuiteTestCaseIdsAsync(project, id, suite.Id);
+            allCases.UnionWith(ids);
+            views.Add(new(suite.Id, suite.Name, suite.SuiteType, suite.Parent?.Id,
+                ids.Distinct().Count()));
+        }
+        return new(plan.Id, plan.Name, plan.State, plan.Iteration, plan.RootSuite?.Id,
+            views, allCases.Count);
+    }
+
+    public sealed record TestSuiteOverview(int Id, string Name, string? SuiteType, int? ParentId, int TestCaseCount);
+    public sealed record TestPlanOverview(int Id, string Name, string? State, string? Iteration,
+        int? RootSuiteId, List<TestSuiteOverview> Suites, int UniqueTestCaseCount);
+
+    /// <summary>ado testplan show &lt;id&gt;: plan metadata, hierarchy and distinct test-case count.</summary>
+    public static async Task<int> ShowAsync(Context ctx)
+    {
+        var plan = await GetOverviewAsync(ctx.Client, ctx.RequireProject(),
+            ctx.Id("testplan show <id>"));
+        if (ctx.Json)
+            return Output.WriteJson(plan);
+
+        Console.WriteLine($"Test Plan #{plan.Id}: {plan.Name}");
+        Console.WriteLine($"State:      {plan.State ?? ""}");
+        Console.WriteLine($"Iteration:  {plan.Iteration ?? ""}");
+        Console.WriteLine($"Root suite: {plan.RootSuiteId?.ToString() ?? "-"}");
+        Console.WriteLine();
+        Console.WriteLine("Suites:");
+        var byParent = plan.Suites.ToLookup(s => s.ParentId);
+        var visited = new HashSet<int>();
+        void Print(TestSuiteOverview suite, int depth)
+        {
+            if (!visited.Add(suite.Id)) return;
+            Console.WriteLine($"  {new string(' ', depth * 2)}{suite.Id}  {suite.Name} ({suite.TestCaseCount} cases)");
+            foreach (var child in byParent[suite.Id].OrderBy(s => s.Id))
+                Print(child, depth + 1);
+        }
+        foreach (var suite in plan.Suites.Where(s => s.ParentId is null || !plan.Suites.Any(p => p.Id == s.ParentId)))
+            Print(suite, 0);
+        foreach (var suite in plan.Suites)
+            Print(suite, 0);
+        Console.WriteLine();
+        Console.WriteLine($"Suites: {plan.Suites.Count}; unique test cases: {plan.UniqueTestCaseCount}");
+        Console.WriteLine($"Next: ado testplan export {plan.Id} --output plan.json");
+        return 0;
+    }
+
     /// <summary>ado testplan export &lt;id&gt; [--output file]: the plan as a <see cref="TestPlanFile"/>, on stdout without --output.</summary>
     public static async Task<int> ExportAsync(Context ctx)
     {

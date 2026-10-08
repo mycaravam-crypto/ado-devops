@@ -63,15 +63,14 @@ public static class TestPlanCommands
         Console.WriteLine($"Root suite: {plan.RootSuiteId?.ToString() ?? "-"}");
         Console.WriteLine();
         Console.WriteLine("Suites:");
-        var byParent = plan.Suites.GroupBy(s => s.ParentId)
-            .ToDictionary(g => g.Key, g => g.OrderBy(s => s.Id).ToList());
+        var byParent = plan.Suites.ToLookup(s => s.ParentId);
         var visited = new HashSet<int>();
         void Print(TestSuiteOverview suite, int depth)
         {
             if (!visited.Add(suite.Id)) return;
             Console.WriteLine($"  {new string(' ', depth * 2)}{suite.Id}  {suite.Name} ({suite.TestCaseCount} cases)");
-            if (byParent.TryGetValue(suite.Id, out var children))
-                foreach (var child in children) Print(child, depth + 1);
+            foreach (var child in byParent[suite.Id].OrderBy(s => s.Id))
+                Print(child, depth + 1);
         }
         foreach (var suite in plan.Suites.Where(s => s.ParentId is null || !plan.Suites.Any(p => p.Id == s.ParentId)))
             Print(suite, 0);

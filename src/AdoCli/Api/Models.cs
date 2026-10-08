@@ -58,6 +58,15 @@ public sealed record WorkItem(int Id, Dictionary<string, JsonElement> Fields)
         { ValueKind: JsonValueKind.Undefined or JsonValueKind.Null } => "",
         var v => v.ToString(),
     };
+
+    /// <summary>
+    /// A field as text that can be written back: like <see cref="Field"/>, but identities as "Display Name &lt;unique name&gt;",
+    /// which the server resolves unambiguously.
+    /// </summary>
+    public string Value(string name) => Fields.GetValueOrDefault(name) is { ValueKind: JsonValueKind.Object } o
+        && o.TryGetProperty("displayName", out var n) && o.TryGetProperty("uniqueName", out var u) && u.GetString() is { Length: > 0 } unique
+        ? $"{n.GetString()} <{unique}>"
+        : Field(name);
 }
 
 public sealed record WorkItemRef(int Id);
@@ -99,3 +108,13 @@ public sealed record Build(
     string? SourceBranch,
     IdentityRef? RequestedFor,
     [property: JsonPropertyName("_links")] BuildLinks? Links);
+
+/// <summary>A reference by id; the test API sends these ids as strings.</summary>
+public sealed record IdRef(int Id);
+
+public sealed record TestPlan(int Id, string Name, string? State, string? Iteration, IdRef? RootSuite);
+
+/// <summary>SuiteType: StaticTestSuite, DynamicTestSuite (query-based) or RequirementTestSuite; the root suite has no parent.</summary>
+public sealed record TestSuite(int Id, string Name, string? SuiteType, IdRef? Parent);
+
+public sealed record SuiteTestCase(IdRef TestCase);

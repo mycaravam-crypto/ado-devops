@@ -16,6 +16,7 @@ public static class Help
           repo      list, show, clone, status
           pr        list, show, context, diff, checkout, create, approve, merge
           workitem  list, show, create, edit
+          testplan  list, export, import
           build     list, show, run
 
         Inside a cloned Azure DevOps repository, project and repository are detected
@@ -55,8 +56,8 @@ public static class Help
           ado auth status               show server, user, TLS mode and proxy in effect
           ado auth logout               remove stored credentials (~/.ado/config.json)
 
-        The token needs the scopes Code read & write, Work items read & write and
-        Build read & execute. Instead of logging in, CI can set ADO_SERVER and ADO_PAT.
+        The token needs the scopes Code read & write, Work items read & write,
+        Build read & execute and, for testplan, Test management read. Instead of logging in, CI can set ADO_SERVER and ADO_PAT.
 
         Examples:
           ado auth login https://tfs.company.local/tfs/DefaultCollection
@@ -177,6 +178,30 @@ public static class Help
             ado workitem edit - --replace-title abc --with xyz --dry-run
         """;
 
+    const string TestPlan = """
+        ado testplan - export test plans to a JSON file, edit it, import the changes
+
+        Usage:
+          ado testplan list             list test plans of the project
+          ado testplan export <id>      write the plan's suites and test cases, with their steps,
+                                        as JSON to stdout
+              --output <file>           write to this file instead
+          ado testplan import <file>    update the test cases edited in the file
+              --dry-run                 show what would change, change nothing
+              --yes, -y                 do not ask before updating several test cases
+                                        (required when stdin is not a terminal)
+
+        import changes only the title, the fields listed and the steps of test cases that
+        differ from the exported revision; suites and other fields stay as they are. If a
+        test case changed on the server since the export, nothing is imported (exit code 6).
+
+        Examples:
+          ado testplan list
+          ado testplan export 12 --output plan.json
+          ado testplan import plan.json --dry-run
+          ado testplan import plan.json --yes
+        """;
+
     const string Build = """
         ado build - builds
 
@@ -199,6 +224,7 @@ public static class Help
         "repo" => Repo,
         "pr" => Pr,
         "workitem" => WorkItem,
+        "testplan" => TestPlan,
         "build" => Build,
         _ => null,
     };

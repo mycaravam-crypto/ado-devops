@@ -112,7 +112,7 @@ ado pr merge --help           # same as ado pr --help
 
 ## Authentication
 
-Create a personal access token (PAT) in Azure DevOps Server (scopes: Code read & write, Work items read & write, Build read & execute), then:
+Create a personal access token (PAT) in Azure DevOps Server (scopes: Code read & write, Work items read & write, Build read & execute, and Test management read for `ado testplan`), then:
 
 ```bash
 ado auth login https://tfs.company.local/tfs/DefaultCollection   # prompts for the PAT
@@ -234,6 +234,117 @@ ado workitem edit 4711 4712 4713 --assigned-to jane@company.local
   `#id: message` and the rest are still updated; the exit code is then 1. `--json` prints the updated work items.
 - The state names depend on the process template: `Closed` (Agile, CMMI), `Done` (Scrum, Basic) or `Removed`.
 
+## Test plans
+
+Export a test plan to one JSON file, edit test cases, steps and expected results in it — one or hundreds at once,
+with an editor, `jq` or a script — and import the changes:
+
+```bash
+ado testplan list                                 # id, state, iteration and name of each plan in the project
+ado testplan export 12 --output plan.json         # without --output: JSON on stdout
+ado testplan import plan.json --dry-run           # what would change; writes nothing
+ado testplan import plan.json                     # asks before updating several test cases (--yes skips that)
+```
+
+### The file
+
+```json
+{
+  "format": "ado-testplan/1",
+  "project": "Platform",
+  "plan": { "id": 12, "name": "Release 1", "state": "Active", "iteration": "Platform\\Sprint 1", "rootSuiteId": 13 },
+  "suites": [
+    { "id": 13, "name": "Release 1", "suiteType": "StaticTestSuite", "testCaseIds": [101] },
+    { "id": 14, "name": "Login", "suiteType": "StaticTestSuite", "parentId": 13, "testCaseIds": [101, 102] }
+  ],
+  "testCases": [
+    {
+      "id": 101,
+      "rev": 5,
+      "title": "Login works",
+      "fields": {
+        "System.State": "Design",
+        "System.AssignedTo": "Jane Doe <jane@company.local>",
+        "System.AreaPath": "Platform",
+        "System.IterationPath": "Platform\\Sprint 1",
+        "System.Tags": "",
+        "Microsoft.VSTS.Common.Priority": "2",
+        "System.Description": ""
+      },
+      "steps": [
+        { "id": 2, "action": "<DIV><P>Open the login page</P></DIV>", "expectedResult": "" },
+        { "id": 3, "action": "Log in as <B>jane</B>", "expectedResult": "Start page shows „Willkommen“" },
+        { "id": 4, "sharedStepsId": 555 }
+      ]
+    }
+  ]
+}
+```
+
+- `plan` and `suites` show the hierarchy: every suite with its parent and its test cases in order. A test case in
+  several suites is listed once under `testCases`. Import never changes plans, suites or which test cases they contain.
+- `id` and `rev` say which test case the entry is and which revision it was exported at. Don't change them.
+- `title`, `fields` and `steps` can be edited. `fields` holds field values as text, by reference name. To change
+  another field, add it, e.g. `"Custom.Component": "Login"`. Identities are
+  `"Name <unique name>"`; plain e-mail addresses or `DOMAIN\user` work too.
+- `steps` are the test steps in order. `action` and `expectedResult` are HTML, as Azure DevOps stores them, so plain
+  text works too (write `&lt;` for `<`, `<br>` for a line break). The `id` links a step to its test results and
+  attachments: keep it when you change or move a step, and leave it out for a new step. Delete an entry to remove
+  the step. `{ "id": 4, "sharedStepsId": 555 }` is a reference to the Shared Steps work item 555; it can be moved
+  or removed, but its steps are edited in #555 itself.
+- To edit just some test cases, you can delete the others from `testCases`; import only looks at the ones listed.
+
+### What import does
+
+1. It checks the whole file first: valid JSON, no unknown properties (a typo like `"expectedResults"` is an error, not
+   ignored), ids, revisions, titles and step ids. Every problem is listed with its place in the file (exit code 2).
+2. It compares each test case with the revision in `rev`. Only a title, field or step list that differs is a change;
+   everything else, and every test case without changes, is left alone, so importing an unedited export writes
+   nothing and a new export is identical.
+3. It prints each change — `title: "Old" -> "New"`, `step 2: expected result changed`, `step 4: added`,
+   `removed (was step 3): …`. With `--dry-run` that is all (`--json` prints it as JSON).
+4. If a test case you edited was changed in Azure DevOps since the export (its revision is newer), that is a
+   conflict: nothing at all is imported (exit code 6). Export again and redo those edits, or remove those test cases
+   from the file. Test cases you did not edit may change on the server meanwhile; they are not a conflict.
+5. It updates each changed test case with only the changed fields. The server double-checks the revision, so a
+   change made in the meantime is refused, not overwritten. If one test case is rejected (say an invalid state), the
+   others are still updated and `ado` exits with 1.
+
+Export again before the next round of edits, so the file has the new revisions.
+
+### Example: export, edit, import
+
+```bash
+ado testplan export 12 --output plan.json
+
+# Bulk edit with jq: set every test case to Ready and add an expected result to every step that has none
+jq '.testCases[] |= (.fields["System.State"] = "Ready"
+      | .steps[] |= (if .sharedStepsId == null and .expectedResult == "" then .expectedResult = "No error is shown" else . end))' \
+  plan.json > edited.json
+
+# Single edit by hand: in an editor, change test case 101's title and its second step, add a step at the end:
+#   "title": "Login and logout work",
+#   { "id": 3, "action": "Log in as <B>jane</B>", "expectedResult": "Dashboard opens" },
+#   { "action": "Log out", "expectedResult": "Login page is shown" }
+
+ado testplan import edited.json --dry-run
+# 1 test case to update, 0 unchanged.
+# #101 (rev 5) Login and logout work
+#   title: "Login works" -> "Login and logout work"
+#   System.State: "Design" -> "Ready"
+#   step 1: expected result changed
+#   step 2: expected result changed
+#   step 4: added
+# Dry run: nothing was changed.
+
+ado testplan import edited.json --yes
+ado testplan export 12 --output plan.json        # the new revisions, ready for the next edit
+```
+
+The test plan commands use the `test` REST area, which is released in API version 5.0 and served by Azure DevOps
+Server 2019, 2020 (Dev18.M170) and 2022, so the default `apiVersion` works. The token needs the *Test management*
+read scope besides *Work items read & write*.
+
 ## Builds
 
 ```bash
@@ -285,9 +396,9 @@ ado workitem list --all --tag xyz --ids   # ids only, one per line, for `ado wor
 ado build show 815 --json
 ```
 
-Commands that change state (`pr create`, `pr approve`, `pr merge`, `workitem create`, `workitem edit`, `build run`)
-never prompt when given `--title` / `--yes`; `workitem edit` on several items fails instead of prompting when stdin
-is not a terminal and `--yes` is missing. Credentials never appear in any output.
+Commands that change state (`pr create`, `pr approve`, `pr merge`, `workitem create`, `workitem edit`,
+`testplan import`, `build run`) never prompt when given `--title` / `--yes`; `workitem edit` and `testplan import`
+on several items fail instead of prompting when stdin is not a terminal and `--yes` is missing. Credentials never appear in any output.
 
 ## Configuration
 

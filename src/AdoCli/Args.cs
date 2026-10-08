@@ -5,7 +5,7 @@ using AdoCli.Api;
 /// <summary>Positional arguments plus --options. Options not listed in <see cref="Flags"/> take a value; a repeated option keeps every value.</summary>
 public sealed class Args
 {
-    static readonly HashSet<string> Flags = ["--debug", "--help", "-h", "--version", "--json", "--mine", "--yes", "-y", "--squash", "--insecure", "--all", "--ids", "--dry-run"];
+    static readonly HashSet<string> Flags = ["--debug", "--help", "-h", "--version", "--json", "--mine", "--yes", "-y", "--squash", "--insecure", "--all", "--ids", "--summary", "--dry-run"];
 
     readonly Dictionary<string, List<string?>> _options = [];
 

@@ -20,7 +20,7 @@ public sealed record Reviewer(string DisplayName, int Vote);
 
 public sealed record CommitRef(string CommitId);
 
-public sealed record GitUser(string Name, DateTime Date);
+public sealed record GitUser(string Name, DateTime Date, string? Email = null);
 
 public sealed record Commit(string CommitId, string? Comment, GitUser? Author);
 
@@ -30,10 +30,13 @@ public sealed record GitChange(GitItem Item, string ChangeType, string? Original
 
 public sealed record CommitDiffs(List<GitChange> Changes);
 
+/// <summary>A commit with the details of GET commits/{id}; <see cref="WorkItems"/> is null when the server did not report links.</summary>
+public sealed record GitCommit(string CommitId, List<string>? Parents, GitUser? Author, GitUser? Committer, string? Comment, List<ResourceRef>? WorkItems);
+
 /// <summary>A changed file; <see cref="OriginalPath"/> is set for renames.</summary>
 public sealed record Change(string Path, string ChangeType, string? OriginalPath);
 
-public sealed record ResourceRef(string Id);
+public sealed record ResourceRef(string Id, string? Url = null);
 
 public sealed record PullRequest(
     int PullRequestId,

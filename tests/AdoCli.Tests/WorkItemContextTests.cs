@@ -197,6 +197,21 @@ public class WorkItemContextTests
         Assert.Equal(items, WorkItemCommands.Criteria(html).Select(c => c.Text));
 
     [Fact]
+    public void BuildContextIgnoresLinksThatAreNotWorkItemsOrNotParentChildRelated()
+    {
+        var current = new WorkItem(9, []) { Rev = 1, Relations = [new("System.LinkTypes.Dependency-Forward", "https://tfs/_apis/wit/workItems/2"),
+            new("System.LinkTypes.Related", "https://tfs/_apis/wit/workItems/notanumber"), new("System.LinkTypes.Related", "https://tfs/_apis/wit/workItems/3")] };
+
+        var context = WorkItemCommands.BuildContext("https://tfs", current, null, new Dictionary<int, WorkItem>(),
+            WorkItemCommands.DescriptionFields, WorkItemCommands.CriteriaFields);
+
+        Assert.Equal([3], context.Relations.Items!.Select(r => r.Id));
+        Assert.Null(context.ChangedDate);
+        Assert.Null(context.Description.SourceField);
+        Assert.Contains("linked work item 3 is not visible", Assert.Single(context.Warnings));
+    }
+
+    [Fact]
     public async Task OutputIsDeterministic()
     {
         var (first, _) = await RunAsync(n => n == 0 ? Current : Linked, "workitem", "context", "4711");

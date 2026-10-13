@@ -80,6 +80,7 @@ public static class Program
             ("pr", "create") => PrCommands.CreateAsync(ctx),
             ("pr", "approve") => PrCommands.ApproveAsync(ctx),
             ("pr", "merge") => PrCommands.MergeAsync(ctx),
+            ("commit", "context") => CommitCommands.ContextAsync(ctx),
             ("workitem", "list") => WorkItemCommands.ListAsync(ctx),
             ("workitem", "show") => WorkItemCommands.ShowAsync(ctx),
             ("workitem", "create") => WorkItemCommands.CreateAsync(ctx),

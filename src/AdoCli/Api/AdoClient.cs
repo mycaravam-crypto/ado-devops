@@ -19,6 +19,9 @@ public sealed class AdoClient
     readonly string _apiVersion;
     readonly bool _debug;
 
+    /// <summary>The server (collection) URL without a trailing slash.</summary>
+    public string Server => _server;
+
     public const string CredentialsInUrl = "the server URL must not contain credentials; log in with a personal access token instead";
 
     public AdoClient(string server, string pat, bool debug = false, HttpMessageHandler? handler = null, string apiVersion = DefaultApiVersion)
@@ -123,6 +126,22 @@ public sealed class AdoClient
             all.AddRange(page);
         } while (page.Count == pageSize);
         return all.Where(c => !c.Item.IsFolder).Select(c => new Change(c.Item.Path, c.ChangeType, c.OriginalPath)).OrderBy(c => c.Path, StringComparer.Ordinal).ToList();
+    }
+
+    /// <summary>A commit by its full SHA, with the full comment and its parents.</summary>
+    public Task<GitCommit> GetCommitAsync(string project, string repo, string commitId) =>
+        SendAsync<GitCommit>(HttpMethod.Get, Url(project, $"git/repositories/{Uri.EscapeDataString(repo)}/commits/{Uri.EscapeDataString(commitId)}", "changeCount=0"));
+
+    /// <summary>
+    /// The first commit of the history at <paramref name="commitId"/>, i.e. that commit, with the work items linked to it;
+    /// only this list query knows includeWorkItems. Null when the server returns no commit.
+    /// </summary>
+    public async Task<GitCommit?> GetCommitWorkItemsAsync(string project, string repo, string commitId)
+    {
+        var query = $"searchCriteria.itemVersion.version={Uri.EscapeDataString(commitId)}&searchCriteria.itemVersion.versionType=commit" +
+            "&searchCriteria.$top=1&searchCriteria.includeWorkItems=true";
+        var url = Url(project, $"git/repositories/{Uri.EscapeDataString(repo)}/commits", query);
+        return (await SendAsync<ListResponse<GitCommit>>(HttpMethod.Get, url)).Value?.FirstOrDefault();
     }
 
     public Task<WorkItem> GetWorkItemAsync(int id) =>
@@ -330,8 +349,19 @@ public sealed class AdoClient
         if (response.StatusCode == HttpStatusCode.NonAuthoritativeInformation)
             throw AuthFailed();
         onResponse?.Invoke(response);
-        return (await response.Content.ReadFromJsonAsync<T>(Json.Options))!;
+        try
+        {
+            return await response.Content.ReadFromJsonAsync<T>(Json.Options)
+                ?? throw new AdoException($"unexpected empty response from Azure DevOps Server ({method} {Path(url)})");
+        }
+        catch (JsonException e)
+        {
+            throw new AdoException($"unexpected response from Azure DevOps Server ({method} {Path(url)}): {e.Message}");
+        }
     }
+
+    // The path of a URL for messages; the query is left out.
+    static string Path(string url) => Uri.TryCreate(url, UriKind.Absolute, out var u) ? u.AbsolutePath : url;
 
     static AdoException AuthFailed() => new("authentication failed.\n\nRun:\n  ado auth login", AdoException.Auth);
 

@@ -15,6 +15,7 @@ public static class Help
           config    list, get, set, unset
           repo      list, show, clone, status
           pr        list, show, context, diff, checkout, create, approve, merge
+          commit    context
           workitem  list, show, create, edit
           testplan  list, show, export, import
           build     list, show, run
@@ -133,6 +134,26 @@ public static class Help
           ado pr merge 142 --squash --yes
         """;
 
+    const string Commit = """
+        ado commit - commits
+
+        Usage:
+          ado commit context <commit>   a commit and the work items explicitly linked to it,
+                                        as JSON (schema ado.commit-context/v1); read-only
+
+        <commit> is a full 40-character SHA. Inside a clone of the repository, a short SHA,
+        HEAD or a branch also works (resolved with git rev-parse). The repository comes from
+        the clone or --repo/--project; ado never searches other repositories.
+
+        workItems.status is "verified" when the server reported the commit's links (items may
+        be empty: no links) and "unavailable" when it did not; warnings say why.
+
+        Examples:
+          ado commit context HEAD
+          ado commit context 4b825dc642cb6eb9a060e54bf8d69288fbee4904 --project Platform --repo backend
+          ado commit context HEAD | jq '.workItems.items[].id'
+        """;
+
     const string WorkItem = """
         ado workitem - work items
 
@@ -231,6 +252,7 @@ public static class Help
         "config" => Config,
         "repo" => Repo,
         "pr" => Pr,
+        "commit" => Commit,
         "workitem" => WorkItem,
         "testplan" => TestPlan,
         "build" => Build,

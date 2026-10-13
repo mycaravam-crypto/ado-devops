@@ -161,6 +161,49 @@ ado pr create                 # prompts; or --title t [--description d] [--sourc
 - `pr merge` shows the PR and asks for confirmation (`--yes` / `-y` skips it). If branch policies still have to pass,
   the server only queues the completion, and `ado` says so.
 
+## Commits
+
+```bash
+ado commit context HEAD       # inside a clone: the commit and the work items explicitly linked to it, as JSON
+ado commit context 4b825dc642cb6eb9a060e54bf8d69288fbee4904 --project Platform --repo backend
+ado commit context HEAD | jq '.workItems.items[].id'
+```
+
+`commit context` is read-only (GET requests only) and always prints JSON. Outside a clone of the repository the
+commit must be a full 40-character SHA; inside one, a short SHA, `HEAD` or a branch is resolved with `git rev-parse`.
+The repository comes from the clone or `--project`/`--repo`; `ado` never searches other repositories for a commit.
+Links come from the server's commit↔work item links (`searchCriteria.includeWorkItems`), never from commit messages.
+
+```json
+{
+  "schema": "ado.commit-context/v1",
+  "server": "https://tfs.company.local/tfs/DefaultCollection",
+  "project": "Platform",
+  "repository": { "id": "2222…", "name": "backend" },
+  "commit": {
+    "commitId": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+    "parents": ["…"],
+    "author": { "name": "Jane", "date": "2026-10-01T08:00:00Z", "email": "jane@company.local" },
+    "committer": { "name": "Jane", "date": "2026-10-01T08:05:00Z", "email": "jane@company.local" },
+    "comment": "Fix login timeout"
+  },
+  "workItems": {
+    "status": "verified",
+    "items": [
+      { "id": 4711, "source": "commit-workitem", "url": "https://tfs.company.local/tfs/DefaultCollection/_apis/wit/workItems/4711",
+        "webUrl": "https://tfs.company.local/tfs/DefaultCollection/_workitems/edit/4711" }
+    ]
+  },
+  "warnings": []
+}
+```
+
+- `workItems.status` is `verified` when the server reported the commit's links; `items` is then complete and `[]`
+  means the commit has no linked work items. It is `unavailable` when the server did not report them (an older server
+  ignoring `includeWorkItems`, or a different commit coming back); `items` is then left out and `warnings` says why.
+  Unknown is never reported as "no links".
+- Items are sorted by id and listed once. A commit that does not exist exits with 5, missing permissions with 4.
+
 ## Work items
 
 ```bash
@@ -371,7 +414,8 @@ ado build run <definition-id> [--branch b]   # default: the definition's default
 ## JSON
 
 `--json` makes data commands print JSON on stdout. Messages, prompts and errors go to stderr, so stdout is always
-either JSON or empty (`auth` commands print plain text only). `ado pr context <id>` always prints JSON.
+either JSON or empty (`auth` commands print plain text only). `ado pr context <id>` and `ado commit context <commit>`
+always print JSON. A response from the server that is not the expected JSON is reported as an error (exit code 1).
 
 ```bash
 ado pr list --json | jq '.[].pullRequestId'
@@ -406,6 +450,7 @@ work from JSON and exit codes alone:
 ado repo status --json        # where am I?
 ado pr context 142 --json     # PR, reviewers, commits, changed files, linked work items
 ado pr diff 142 --json        # changed files; without --json, the full unified diff
+ado commit context HEAD       # a commit and its explicitly linked work items
 ado workitem show 4711 --json
 ado workitem list --all --tag xyz --ids   # ids only, one per line, for `ado workitem edit -`
 ado build show 815 --json

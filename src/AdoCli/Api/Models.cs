@@ -54,6 +54,15 @@ public sealed record PullRequest(
 /// <summary>Work item fields are kept raw: their set and shape depend on the process template.</summary>
 public sealed record WorkItem(int Id, Dictionary<string, JsonElement> Fields)
 {
+    /// <summary>The revision these fields belong to.</summary>
+    public int? Rev { get; init; }
+
+    /// <summary>The REST URL of the work item (or of the revision read).</summary>
+    public string? Url { get; init; }
+
+    /// <summary>Links to other work items and artifacts; only sent with $expand=relations.</summary>
+    public List<WorkItemRelation>? Relations { get; init; }
+
     /// <summary>A field as text; identity fields (objects since Server 2019) yield their display name.</summary>
     public string Field(string name) => Fields.GetValueOrDefault(name) switch
     {
@@ -71,6 +80,9 @@ public sealed record WorkItem(int Id, Dictionary<string, JsonElement> Fields)
         ? $"{n.GetString()} <{unique}>"
         : Field(name);
 }
+
+/// <summary>A link of a work item: <see cref="Rel"/> is the link type, e.g. System.LinkTypes.Hierarchy-Reverse for its parent.</summary>
+public sealed record WorkItemRelation(string Rel, string Url);
 
 public sealed record WorkItemRef(int Id);
 

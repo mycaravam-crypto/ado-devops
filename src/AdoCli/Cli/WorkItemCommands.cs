@@ -378,12 +378,32 @@ public static partial class WorkItemCommands
         return (rows, blocks);
     }
 
-    /// <summary>Descriptions are HTML; line breaks are kept, other markup dropped.</summary>
-    public static string PlainText(string html) =>
-        WebUtility.HtmlDecode(Tag().Replace(LineBreak().Replace(html, "\n"), "")).Trim();
+    /// <summary>
+    /// Descriptions are HTML; line breaks are kept, list items start with "- ", other markup is dropped. Script and style
+    /// content and comments are removed, nothing is ever rendered or run.
+    /// </summary>
+    public static string PlainText(string html)
+    {
+        var text = Hidden().Replace(html, "");
+        text = ListItem().Replace(LineBreak().Replace(text, "\n"), "- ");
+        text = WebUtility.HtmlDecode(Tag().Replace(text, "")).Replace('\u00a0', ' ');
+        return BlankLines().Replace(TrailingSpace().Replace(text, ""), "\n\n").Trim();
+    }
 
     [GeneratedRegex(@"<br\s*/?>|</(p|div|li|h\d)>", RegexOptions.IgnoreCase)]
     private static partial Regex LineBreak();
+
+    [GeneratedRegex(@"<(script|style)\b.*?</\1\s*>|<!--.*?-->", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    private static partial Regex Hidden();
+
+    [GeneratedRegex(@"<li\b[^>]*>", RegexOptions.IgnoreCase)]
+    private static partial Regex ListItem();
+
+    [GeneratedRegex(@"[ \t]+(?=\n|$)")]
+    private static partial Regex TrailingSpace();
+
+    [GeneratedRegex(@"\n{3,}")]
+    private static partial Regex BlankLines();
 
     [GeneratedRegex("<[^>]*>")]
     private static partial Regex Tag();

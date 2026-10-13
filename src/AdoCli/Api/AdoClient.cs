@@ -54,6 +54,7 @@ public sealed class AdoClient
     public async Task<List<Repository>> GetRepositoriesAsync(string? project) =>
         (await SendAsync<ListResponse<Repository>>(HttpMethod.Get, Url(project, "git/repositories"))).Value;
 
+    /// <summary>A repository by name or id, with its id, default branch and project.</summary>
     public Task<Repository> GetRepositoryAsync(string project, string repo) =>
         SendAsync<Repository>(HttpMethod.Get, Url(project, $"git/repositories/{Uri.EscapeDataString(repo)}"));
 

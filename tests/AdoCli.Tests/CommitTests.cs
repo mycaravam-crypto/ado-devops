@@ -165,6 +165,22 @@ public class CommitTests
     }
 
     [Fact]
+    public void BuildIgnoresInvalidIdsWithAWarning()
+    {
+        var repository = new Repository(Guid.Empty, "backend", null, null, null, new ProjectRef("Platform"));
+        var commit = new GitCommit(Sha, null, null, null, null, null);
+        var linked = commit with { WorkItems = [new("abc"), new("5")] };
+
+        var context = CommitCommands.Build("https://tfs", repository, commit, linked);
+
+        Assert.Equal("verified", context.WorkItems.Status);
+        Assert.Equal([5], context.WorkItems.Items!.Select(i => i.Id));
+        Assert.Equal("", context.Commit.Comment);
+        Assert.Empty(context.Commit.Parents);
+        Assert.Contains("invalid id 'abc'", Assert.Single(context.Warnings));
+    }
+
+    [Fact]
     public void HelpListsCommitContext()
     {
         Assert.Contains("ado commit context <commit>", Help.For("commit"));

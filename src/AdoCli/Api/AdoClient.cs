@@ -148,6 +148,10 @@ public sealed class AdoClient
     public Task<WorkItem> GetWorkItemAsync(int id) =>
         SendAsync<WorkItem>(HttpMethod.Get, Url(null, $"wit/workitems/{id}"));
 
+    /// <summary>A work item with every field and its links (relations), as it is now.</summary>
+    public Task<WorkItem> GetWorkItemWithRelationsAsync(int id) =>
+        SendAsync<WorkItem>(HttpMethod.Get, Url(null, $"wit/workitems/{id}", "$expand=relations"));
+
     /// <summary>
     /// Work items matching <paramref name="filter"/> (default: open ones assigned to the current user), most recently changed
     /// first; all of them (the server caps a query at 20000) unless <paramref name="limit"/> is set.

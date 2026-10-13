@@ -161,6 +161,14 @@ public static class Help
           ado workitem list             list work items assigned to you, open ones by default
               --summary                 count and breakdown by type, state and priority
           ado workitem show <id>        show a work item with every field
+          ado workitem context <id>     requirement context as JSON (schema ado.requirement-context/v1):
+                                        title, description, acceptance criteria, parent/child/related
+                                        links; read-only
+              --revision <n>            the text as it was at revision n (links: unavailable)
+              --description-field <ref> read the description from this field instead of
+                                        System.Description, then Microsoft.VSTS.TCM.ReproSteps
+              --criteria-field <ref>    read acceptance criteria from this field instead of
+                                        Microsoft.VSTS.Common.AcceptanceCriteria
           ado workitem create           create a work item; prompts unless --type and --title are given
           ado workitem edit <id>...     change fields of one or more work items; - reads ids from stdin
 
@@ -193,6 +201,7 @@ public static class Help
         Examples:
           ado workitem list --type Bug --state Active,Resolved
           ado workitem list --limit 200 --summary
+          ado workitem context 4711 --revision 3
           ado workitem list --all --state any --contains timeout
           ado workitem create --type Task --title "Update docs" --field Microsoft.VSTS.Common.Priority=2
           ado workitem edit 4711 --state Active --assigned-to jane@company.local --comment "Picked up"

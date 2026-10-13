@@ -214,6 +214,7 @@ ado workitem list --limit 200 --summary            # displayed count, type/state
 # --all removes only the assignee filter; use --state any for closed items as well.
 ado workitem list --all --state any --contains tzu   # everyone's items, any state, "tzu" in title or description
 ado workitem show 4711        # title, type, state, assignee, then every other field the server returns
+ado workitem context 4711     # requirement context as JSON: text, acceptance criteria, parent/child/related links
 ado workitem create           # prompts; or --type Bug --title t [--description d] [field options]
 ado workitem edit 4711 --state Active --assigned-to jane@company.local --comment "Picked up"
 ```
@@ -279,6 +280,75 @@ ado workitem edit 4711 4712 4713 --assigned-to jane@company.local
 - Items are updated one by one. One the server rejects (a state the process does not allow, say) is reported as
   `#id: message` and the rest are still updated; the exit code is then 1. `--json` prints the updated work items.
 - The state names depend on the process template: `Closed` (Agile, CMMI), `Done` (Scrum, Basic) or `Removed`.
+
+### Requirement context
+
+`ado workitem context <id>` prints the business intent of a work item as JSON (schema `ado.requirement-context/v1`):
+title, type, state, description, acceptance criteria, revision and the explicitly linked parent, child and related
+work items. It is read-only and always prints JSON.
+
+```bash
+ado workitem context 4711
+ado workitem context 4711 --revision 3                        # the text as it was at revision 3
+ado workitem context 4711 --criteria-field Custom.Akzeptanzkriterien   # custom process template
+ado workitem context 4711 | jq -r '.acceptanceCriteria.items[].text'
+```
+
+```json
+{
+  "schema": "ado.requirement-context/v1",
+  "server": "https://tfs.company.local/tfs/DefaultCollection",
+  "id": 4711,
+  "revision": 5,
+  "currentRevision": 5,
+  "isCurrent": true,
+  "url": "https://tfs.company.local/tfs/DefaultCollection/_apis/wit/workItems/4711",
+  "webUrl": "https://tfs.company.local/tfs/DefaultCollection/Platform/_workitems/edit/4711",
+  "project": "Platform",
+  "type": "User Story",
+  "state": "Active",
+  "title": "Login times out",
+  "changedDate": "2026-10-01T08:00:00.123Z",
+  "description": {
+    "checkedFields": ["System.Description", "Microsoft.VSTS.TCM.ReproSteps"],
+    "sourceField": "System.Description",
+    "html": "<div>Users are logged out &amp; lose work.</div>",
+    "text": "Users are logged out & lose work."
+  },
+  "acceptanceCriteria": {
+    "checkedFields": ["Microsoft.VSTS.Common.AcceptanceCriteria"],
+    "sourceField": "Microsoft.VSTS.Common.AcceptanceCriteria",
+    "html": "<ul><li>Session lasts <b>8h</b></li><li>Warning before logout</li></ul>",
+    "text": "- Session lasts 8h\n- Warning before logout",
+    "items": [ { "index": 1, "text": "Session lasts 8h" }, { "index": 2, "text": "Warning before logout" } ]
+  },
+  "relations": {
+    "status": "current",
+    "items": [
+      { "kind": "parent", "rel": "System.LinkTypes.Hierarchy-Reverse", "id": 100,
+        "url": "https://tfs.company.local/tfs/DefaultCollection/_apis/wit/workItems/100",
+        "title": "Reliable sessions", "type": "Feature", "state": "Active" }
+    ]
+  },
+  "warnings": []
+}
+```
+
+- **Fields:** the description is the first non-empty one of `System.Description` and `Microsoft.VSTS.TCM.ReproSteps`
+  (Bugs); acceptance criteria come from `Microsoft.VSTS.Common.AcceptanceCriteria`. For custom or localized process
+  templates, `--description-field <ref>` and `--criteria-field <ref>` name the field to read instead. `checkedFields`
+  lists what was tried and `sourceField` what was used; when no field has a value, `sourceField`, `html` and `text` are
+  left out and `items` is empty. Nothing is filled in from another field or revision.
+- **Text:** `html` is the raw field value, `text` its plain text: tags removed, line breaks kept, list items as `- `,
+  entities decoded; script and style content and comments are dropped. Nothing is rendered or run.
+- **Criteria items:** the list items when the field is an HTML list, otherwise its non-empty lines, in their original
+  order. `index` is only the position, not a stable identifier.
+- **Relations:** only explicit parent (`Hierarchy-Reverse`), child (`Hierarchy-Forward`) and related links, sorted by
+  kind, then id; nothing is inferred from titles or paths. A linked item that is deleted or not visible to you keeps its
+  id and link but has no title, type or state, and `warnings` says so.
+- **Revisions:** `--revision n` reads the fields of revision n (`isCurrent: false`). The server only reports the links
+  of the current revision, so for an older revision `relations.status` is `unavailable` and `items` is left out; current
+  links are never shown as historical. A revision after the current one exits with 5.
 
 ## Test plans
 
@@ -452,6 +522,7 @@ ado pr context 142 --json     # PR, reviewers, commits, changed files, linked wo
 ado pr diff 142 --json        # changed files; without --json, the full unified diff
 ado commit context HEAD       # a commit and its explicitly linked work items
 ado workitem show 4711 --json
+ado workitem context 4711     # title, description, acceptance criteria, parent/child/related links
 ado workitem list --all --tag xyz --ids   # ids only, one per line, for `ado workitem edit -`
 ado build show 815 --json
 ```

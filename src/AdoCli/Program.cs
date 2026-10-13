@@ -83,6 +83,7 @@ public static class Program
             ("commit", "context") => CommitCommands.ContextAsync(ctx),
             ("workitem", "list") => WorkItemCommands.ListAsync(ctx),
             ("workitem", "show") => WorkItemCommands.ShowAsync(ctx),
+            ("workitem", "context") => WorkItemCommands.ContextAsync(ctx),
             ("workitem", "create") => WorkItemCommands.CreateAsync(ctx),
             ("workitem", "edit") => WorkItemCommands.EditAsync(ctx),
             ("testplan", "list") => TestPlanCommands.ListAsync(ctx),

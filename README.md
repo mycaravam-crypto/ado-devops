@@ -215,6 +215,7 @@ ado workitem list --limit 200 --summary            # displayed count, type/state
 ado workitem list --all --state any --contains tzu   # everyone's items, any state, "tzu" in title or description
 ado workitem show 4711        # title, type, state, assignee, then every other field the server returns
 ado workitem context 4711     # requirement context as JSON: text, acceptance criteria, parent/child/related links
+ado workitem search "sevrer crash"   # titles like the query, despite typos, partial words or word order
 ado workitem create           # prompts; or --type Bug --title t [--description d] [field options]
 ado workitem edit 4711 --state Active --assigned-to jane@company.local --comment "Picked up"
 ```
@@ -349,6 +350,43 @@ ado workitem context 4711 | jq -r '.acceptanceCriteria.items[].text'
 - **Revisions:** `--revision n` reads the fields of revision n (`isCurrent: false`). The server only reports the links
   of the current revision, so for an older revision `relations.status` is `unavailable` and `items` is left out; current
   links are never shown as historical. A revision after the current one exits with 5.
+
+### Search
+
+`ado workitem search <query>` finds work items whose title resembles the query: typos (`sevrer` → "Server"), partial
+words (`auth` → "Authentication") and another word order (`login fehler` → "Fehler beim Login") still match. Every
+state and everyone's items are searched; `--type`, `--state` and `--project` narrow it down, `--limit n` shows the n
+best (default 10).
+
+```bash
+ado workitem search "login fehler"
+ado workitem search sevrer --type Bug --state Active
+ado workitem search "token expiry" --json | jq '.items[0].id'
+ado workitem search 4711       # the work item with that id first, then titles containing 4711
+```
+
+```json
+{
+  "schema": "ado.workitem-search/v1",
+  "query": "sevrer",
+  "candidates": { "count": 12, "max": 500, "truncated": false },
+  "items": [
+    { "id": 4711, "title": "Server crashes on start", "type": "Bug", "state": "Active", "createdBy": "Ann Lee",
+      "assignedTo": "Bo Chen", "score": 0.64, "webUrl": "https://tfs.company.local/tfs/DefaultCollection/Platform/_workitems/edit/4711",
+      "match": "candidate" }
+  ]
+}
+```
+
+- **How:** the server returns up to 500 candidates, most recently changed first: work items whose title contains a
+  3-letter piece of a query word, or of that word with two neighbouring letters swapped. It checks your permissions as
+  for any query; there is no local index or cache. `ado` then ranks them: how well each query word matches a title
+  word (exact, prefix, one typo up to 5 letters, two from 6), plus the 3-letter pieces both share.
+- **Order:** an id match first (`match: "id"`), then by `score` (0–1), then newest id. The same server state gives the
+  same output.
+- **Limits:** only titles are searched. Words of up to 3 letters must match exactly or as a prefix. When
+  `candidates.truncated` is true, the server had more candidates than 500 and a match may be missing; make the query
+  more specific or narrow it down. `match: "candidate"` means similar text, not a verified link.
 
 ## Test plans
 
@@ -523,6 +561,7 @@ ado pr diff 142 --json        # changed files; without --json, the full unified 
 ado commit context HEAD       # a commit and its explicitly linked work items
 ado workitem show 4711 --json
 ado workitem context 4711     # title, description, acceptance criteria, parent/child/related links
+ado workitem search "login timeout" --json   # ranked candidates; then `ado workitem context <id>` for the chosen one
 ado workitem list --all --tag xyz --ids   # ids only, one per line, for `ado workitem edit -`
 ado build show 815 --json
 ```

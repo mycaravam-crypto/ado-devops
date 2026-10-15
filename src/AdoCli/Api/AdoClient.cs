@@ -206,7 +206,7 @@ public sealed class AdoClient
     static readonly string[] ListFields = ["System.AssignedTo", "Microsoft.VSTS.Common.Priority", "System.IterationPath", "System.ChangedDate"];
 
     // WIQL string literals are single-quoted; a quote inside one is doubled.
-    static string Literal(string value) => "'" + value.Replace("'", "''") + "'";
+    public static string Literal(string value) => "'" + value.Replace("'", "''") + "'";
 
     static string WiqlList(IEnumerable<string> values) => string.Join(", ", values.Select(Literal));
 

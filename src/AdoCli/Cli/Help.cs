@@ -169,6 +169,11 @@ public static class Help
                                         System.Description, then Microsoft.VSTS.TCM.ReproSteps
               --criteria-field <ref>    read acceptance criteria from this field instead of
                                         Microsoft.VSTS.Common.AcceptanceCriteria
+          ado workitem search <query>   work items whose title resembles the query, despite typos,
+                                        partial words or word order; any state, everyone's
+              --type, --state           narrow the search down, as for list
+              --limit <n>               the n best (default 10)
+              --json                    as JSON (schema ado.workitem-search/v1)
           ado workitem create           create a work item; prompts unless --type and --title are given
           ado workitem edit <id>...     change fields of one or more work items; - reads ids from stdin
 
@@ -202,6 +207,7 @@ public static class Help
           ado workitem list --type Bug --state Active,Resolved
           ado workitem list --limit 200 --summary
           ado workitem context 4711 --revision 3
+          ado workitem search "login fehler" --type Bug
           ado workitem list --all --state any --contains timeout
           ado workitem create --type Task --title "Update docs" --field Microsoft.VSTS.Common.Priority=2
           ado workitem edit 4711 --state Active --assigned-to jane@company.local --comment "Picked up"

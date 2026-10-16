@@ -110,6 +110,7 @@ public static class TestPlanTraceExport
                 .Select(r => TestPlanCoverage.LinkedId(r.Url)).OfType<int>()
                 .Where(selectedIds.Contains).Distinct().Order().ToArray();
             requirements.Add(new(id, item.Field("System.Title"), linked));
+            progress?.Report("requirements", ++requirementDone, requirementIds.Length);
         }
         return new("ado.test-traceability/v2", project, area, DateTimeOffset.UtcNow,
             includedPlans, cases, memberships, requirements.ToArray());

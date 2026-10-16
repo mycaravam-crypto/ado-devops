@@ -449,6 +449,18 @@ ado testplan export 12 --format html --with-results --area "Product\\ALPHA" --ou
 
 Current point outcomes show Passed, Failed, Blocked, and Not Run. Executed = Passed + Failed; pass rate = Passed / executed (0% for an empty denominator). All other states count as Not Run, so the results are **not guaranteed to equal** Azure DevOps Analytics KPIs. The 14/30-day history shows daily test-run *result events*, not historical test-point snapshots; a single test case can appear multiple times in the history. Filtering affects the point report and the history, not the underlying test case definitions in HTML export. A server that does not expose the legacy point API will report an API error; it will not silently substitute case-level metrics.
 
+### Report quality and validation
+
+For a shareable HTML export, use `--exclude-parameters` to omit local parameter definitions and parameter values from **HTML only**. JSON remains an editable round-trip and still contains these fields; protect JSON files accordingly. Shared-step contents may also contain sensitive test data.
+
+```bash
+ado testplan export 12 --format html --with-results --area "Product\\ALPHA" --exclude-parameters --output plan.html
+```
+
+Reports include a UTC generation timestamp, source and (when supplied) an Area Path. The progress report separates **current test-point status** (suite × case × configuration) from **historical test-run events** for the selected 14/30-day period. Trends count events, not past coverage snapshots. `Blocked` and missing outcomes do not count as executed in this tool, so percentages may differ from the Azure DevOps Analytics progress report.
+
+**Manual server comparison checklist:** choose a plan with a test case in multiple suites/configurations; compare total points and Passed/Failed/Blocked/Not Run to the Azure DevOps result report for the same scope and time. Repeat for a plan with no runs and one with recent failures. Record any differences in state mapping or filtering instead of silently adjusting percentages. Automated parity is not asserted without an accessible server fixture.
+
 ### The file
 
 ```json

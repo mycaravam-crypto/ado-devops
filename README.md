@@ -411,6 +411,7 @@ Suites are shown in a stable hierarchy; test cases assigned to several suites co
 Use `export` when you need a portable edit/import document. In `show`, expected results are part of the test case definition; `--with results` instead reads actual outcomes from test runs. An absent run is not a passing test. All modes are read-only.
 
 HTML is a self-contained, read-only report with suite navigation and tables of actions and expected results. Import continues to use JSON only.
+Shared Steps references are resolved recursively in the HTML report from the referenced work item's `Microsoft.VSTS.TCM.Steps` field. Custom or localized work-item type names are supported; the export does not require the literal type name `Shared Steps`. A missing/inaccessible reference or empty steps field is shown as a warning in the report. Cyclic references are detected. The original shared-step references remain unchanged in JSON exports and imports.
 
 ### The file
 

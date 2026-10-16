@@ -29,6 +29,7 @@ public static class TestPlanCoverage
         relation.Rel.Equals("Microsoft.VSTS.Common.TestedBy-Forward", StringComparison.OrdinalIgnoreCase)
         || relation.Rel.Equals("Microsoft.VSTS.Common.TestedBy-Reverse", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>Calculates requirement coverage and latest execution outcomes for a single test plan and Area Path, including child areas.</summary>
     public static async Task<Report> BuildAsync(AdoClient client, string project, int planId, string area)
     {
         var plan = await client.GetTestPlanAsync(project, planId);
@@ -68,6 +69,7 @@ public static class TestPlanCoverage
             requirements.Count(r => r.Covered), caseIds.Count, executed, passed, requirements);
     }
 
+    /// <summary>Runs the read-only testplan coverage command and writes text, JSON or HTML to stdout or the requested file.</summary>
     public static async Task<int> RunAsync(Context ctx)
     {
         var id = ctx.Id("testplan coverage <id> --area <path> [--format html] [--output file]");

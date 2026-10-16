@@ -15,9 +15,10 @@ public static class TestPlanHtml
     static string Label(string? value) => E(Plain(value));
 
     /// <summary>Renders the complete offline test plan report, optionally including resolved Shared Steps and test progress.</summary>
-    public static string Render(TestPlanFile file, IReadOnlyDictionary<int, IReadOnlyList<TestStep>>? sharedSteps = null, IReadOnlyDictionary<int, string>? sharedErrors = null, TestPlanProgress.Report? progress = null)
+    public static string Render(TestPlanFile file, IReadOnlyDictionary<int, IReadOnlyList<TestStep>>? sharedSteps = null, IReadOnlyDictionary<int, string>? sharedErrors = null, TestPlanProgress.Report? progress = null, bool excludeParameters = false)
     {
         var plan = file.Plan ?? throw new ArgumentException("Missing plan.");
+        var generatedAt = DateTimeOffset.UtcNow;
         var suites = file.Suites ?? [];
         var cases = (file.TestCases ?? []).ToDictionary(c => c.Id);
         var children = suites.ToLookup(s => s.ParentId);
@@ -86,6 +87,11 @@ public static class TestPlanHtml
             .Append("</span><span>").Append(suites.Count).Append(" suites</span><span>")
             .Append(cases.Count).AppendLine(" unique test cases</span></div>");
         if (progress is not null) sb.Append(TestPlanProgress.Html(progress));
+        sb.Append("<p class=\"muted\">Generated (UTC): ").Append(generatedAt.ToString("yyyy-MM-dd HH:mm:ss"))
+            .Append(" · Source: Azure DevOps test plan/work items");
+        if (progress is not null) sb.Append(" · Progress area: ").Append(E(progress.Area ?? "all"));
+        sb.AppendLine("</p>");
+        if (!excludeParameters) sb.AppendLine("<p class=\"muted\">Parameter values may contain sensitive data.</p>");
         var displayed = new HashSet<int>();
         void Section(SuiteInfo suite, int depth)
         {
@@ -107,9 +113,9 @@ public static class TestPlanHtml
                     sb.Append(" <span class=\"badge\">").Append(E(state)).Append("</span>");
                 if (c.Fields?.GetValueOrDefault("System.AreaPath") is { Length: > 0 } area)
                     sb.Append("<p class=\"muted\">Area Path: ").Append(E(area)).AppendLine("</p>");
-                if (c.Fields?.GetValueOrDefault("Microsoft.VSTS.TCM.Parameters") is { Length: > 0 } definitions)
+                if (!excludeParameters && c.Fields?.GetValueOrDefault("Microsoft.VSTS.TCM.Parameters") is { Length: > 0 } definitions)
                     sb.Append("<p class=\"muted\">Parameters: ").Append(Label(definitions)).AppendLine("</p>");
-                if (c.Fields?.GetValueOrDefault("Microsoft.VSTS.TCM.LocalDataSource") is { Length: > 0 } source)
+                if (!excludeParameters && c.Fields?.GetValueOrDefault("Microsoft.VSTS.TCM.LocalDataSource") is { Length: > 0 } source)
                 {
                     var rows = TestPlanParameters.Rows(source);
                     if (rows.Count > 0)

@@ -101,7 +101,9 @@ public static class TestPlanProgress
     {
         static string E(string? v) => WebUtility.HtmlEncode(v ?? "");
         var sb = new StringBuilder();
-        sb.Append("<section id=\"progress\"><h2>Test progress</h2><p class=\"muted\">");
+        sb.Append("<section id=\"progress\"><h2>Test progress</h2><p class=\"muted\">Generated (UTC): ")
+            .Append(DateTimeOffset.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"))
+            .Append(" · Source: legacy Test API 5.0 · ");
         sb.Append("Point-based status (suite × case × configuration); execution history based on test runs. ");
         sb.Append("Area: ").Append(E(r.Area ?? "all")).Append("</p>");
         sb.Append("<div class=\"meta\"><span>Test points: ").Append(r.Points)

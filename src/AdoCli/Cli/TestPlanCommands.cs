@@ -179,7 +179,7 @@ public static class TestPlanCommands
             var (shared, errors) = await ResolveSharedStepsAsync(ctx.Client, file);
             var withResults = ctx.Args.Has("--with-results");
             var progress = withResults ? await TestPlanProgress.BuildAsync(ctx.Client, ctx.RequireProject(), file.Plan!.Id, ctx.Args.Get("--area")) : null;
-            json = TestPlanHtml.Render(file, shared, errors, progress);
+            json = TestPlanHtml.Render(file, shared, errors, progress, ctx.Args.Has("--exclude-parameters"));
         }
         else
             json = file.Write();

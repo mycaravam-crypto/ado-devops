@@ -102,4 +102,18 @@ public class TestPlanHtmlTests
         Assert.Contains("No suites match.", html);
     }
 
+    [Fact]
+    public void HtmlReportSupportsSystemAndManualDarkMode()
+    {
+        var file = new TestPlanFile(TestPlanFile.CurrentFormat, "Project",
+            new PlanInfo(1, "Plan", "Active", null, 10),
+            [new SuiteInfo(10, "Root", "StaticTestSuite", null, [42])],
+            [new TestCaseEntry(42, 1, "Case", null, [])]);
+        var html = TestPlanHtml.Render(file);
+        Assert.Contains("prefers-color-scheme:dark", html);
+        Assert.Contains("data-theme", html);
+        Assert.Contains("id=\"theme-toggle\"", html);
+        Assert.Contains("ado.testplan.theme", html);
+    }
+
 }

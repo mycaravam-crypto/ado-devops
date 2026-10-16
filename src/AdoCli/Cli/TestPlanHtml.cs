@@ -14,7 +14,8 @@ public static class TestPlanHtml
         @"\s+", " ").Trim();
     static string Label(string? value) => E(Plain(value));
 
-    public static string Render(TestPlanFile file, IReadOnlyDictionary<int, IReadOnlyList<TestStep>>? sharedSteps = null, IReadOnlyDictionary<int, string>? sharedErrors = null)
+    /// <summary>Renders the complete offline test plan report, optionally including resolved Shared Steps and test progress.</summary>
+    public static string Render(TestPlanFile file, IReadOnlyDictionary<int, IReadOnlyList<TestStep>>? sharedSteps = null, IReadOnlyDictionary<int, string>? sharedErrors = null, TestPlanProgress.Report? progress = null)
     {
         var plan = file.Plan ?? throw new ArgumentException("Missing plan.");
         var suites = file.Suites ?? [];
@@ -84,6 +85,7 @@ public static class TestPlanHtml
             .Append(E(plan.State)).Append("</span><span>Iteration: ").Append(E(plan.Iteration))
             .Append("</span><span>").Append(suites.Count).Append(" suites</span><span>")
             .Append(cases.Count).AppendLine(" unique test cases</span></div>");
+        if (progress is not null) sb.Append(TestPlanProgress.Html(progress));
         var displayed = new HashSet<int>();
         void Section(SuiteInfo suite, int depth)
         {

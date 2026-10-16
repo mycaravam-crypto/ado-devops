@@ -436,6 +436,19 @@ Test results come from runs belonging to the selected plan; the latest available
 
 The command is read-only. HTML reports are standalone and offline-viewable; JSON remains the editable format for `testplan export` / `import`.
 
+### Test progress (Azure DevOps Server)
+
+`ado testplan progress` reads **test points** (suite + test case + configuration) via the legacy Test REST API 5.0, not the private `/_testManagement/analytics/progressreport` web page. Each point contributes one current outcome, and a test case with multiple configurations contributes multiple points. Filtering with `--area` includes descendants but not similarly prefixed Area Paths.
+
+```bash
+ado testplan progress 12 --area "Product\\ALPHA"
+ado testplan progress 12 --area "Product\\ALPHA" --days 30 --format json
+ado testplan progress 12 --area "Product\\ALPHA" --format html --output progress.html
+ado testplan export 12 --format html --with-results --area "Product\\ALPHA" --output plan.html
+```
+
+Current point outcomes show Passed, Failed, Blocked, and Not Run. Executed = Passed + Failed; pass rate = Passed / executed (0% for an empty denominator). All other states count as Not Run, so the results are **not guaranteed to equal** Azure DevOps Analytics KPIs. The 14/30-day history shows daily test-run *result events*, not historical test-point snapshots; a single test case can appear multiple times in the history. Filtering affects the point report and the history, not the underlying test case definitions in HTML export. A server that does not expose the legacy point API will report an API error; it will not silently substitute case-level metrics.
+
 ### The file
 
 ```json

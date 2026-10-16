@@ -177,7 +177,9 @@ public static class TestPlanCommands
         if (format == "html")
         {
             var (shared, errors) = await ResolveSharedStepsAsync(ctx.Client, file);
-            json = TestPlanHtml.Render(file, shared, errors);
+            var withResults = ctx.Args.Has("--with-results");
+            var progress = withResults ? await TestPlanProgress.BuildAsync(ctx.Client, ctx.RequireProject(), file.Plan!.Id, ctx.Args.Get("--area")) : null;
+            json = TestPlanHtml.Render(file, shared, errors, progress);
         }
         else
             json = file.Write();

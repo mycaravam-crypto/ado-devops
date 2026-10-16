@@ -218,9 +218,11 @@ public static class TestPlanCommands
                     errors[id] = $"Shared steps #{id} not found or inaccessible";
                     continue;
                 }
-                if (item.Field(Type) != "Shared Steps")
+                // Work item type names can be localized or customized by the process template.
+                // The referenced work item's actual Steps field determines whether it can be expanded.
+                if (string.IsNullOrWhiteSpace(item.Field(TestSteps.Field)))
                 {
-                    errors[id] = $"Work item #{id} is not Shared Steps";
+                    errors[id] = $"Shared steps #{id} has no {TestSteps.Field} content (type: {item.Field(Type)})";
                     continue;
                 }
                 var steps = StepsOf(item).Steps;

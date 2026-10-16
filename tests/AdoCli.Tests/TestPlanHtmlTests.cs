@@ -55,4 +55,31 @@ public class TestPlanHtmlTests
         Assert.Contains("Shared steps #5366 not found", TestPlanHtml.Render(file, shared, errors));
     }
 
+    [Theory]
+    [InlineData("Gemeinsame Schritte")]
+    [InlineData("Custom Shared Steps")]
+    public async Task ResolvesSharedStepsRegardlessOfLocalizedWorkItemType(string type)
+    {
+        var xml = TestSteps.Build([new TestStep(1, "Enter username", "Input accepted")], 1);
+        var payload = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            value = new[] { new { id = 5366, fields = new Dictionary<string, string>
+            {
+                ["System.WorkItemType"] = type,
+                [TestSteps.Field] = xml
+            }}}
+        });
+        var stub = new StubHandler(_ => StubHandler.Json(payload));
+        var client = new AdoClient("https://tfs", "token", handler: stub);
+        var file = new TestPlanFile(TestPlanFile.CurrentFormat, "Project",
+            new PlanInfo(10, "Plan", "Active", null, 11),
+            [new SuiteInfo(11, "Root", "StaticTestSuite", null, [42])],
+            [new TestCaseEntry(42, 1, "Case", null, [new TestStep(2, SharedStepsId: 5366)])]);
+
+        var (shared, errors) = await TestPlanCommands.ResolveSharedStepsAsync(client, file);
+        Assert.Empty(errors);
+        Assert.Single(shared[5366]);
+        Assert.Contains("Input accepted", TestPlanHtml.Render(file, shared));
+    }
+
 }

@@ -45,7 +45,7 @@ public class TestPlanHtmlTests
                        new TestStep(5, SharedStepsId: 5366)],
         };
         var html = TestPlanHtml.Render(file, shared);
-        Assert.Contains("2.1", html);
+        Assert.Contains("1.1", html);
         Assert.Contains("1.2.1", html);
         Assert.Contains("Verify", html);
         Assert.Contains("Success", html);

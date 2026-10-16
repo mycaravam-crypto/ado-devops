@@ -806,7 +806,3 @@ Builds read the version from the latest tag, so `ado --version` always says what
 | without git or tags (e.g. a source archive) | `ado 0.0.0-dev` |
 
 To build a specific version yourself, pass it: `dotnet publish src/AdoCli -c Release -p:Version=1.2.3 ...`.
-
-### CLI progress output
-
-Interactive commands report start and completion on **stderr**; JSON and text results remain exclusively on **stdout**. Long-running `testplan trace-export` additionally shows bounded plan/suite and requirement progress while querying ADO. Progress is suppressed when stderr is redirected (including CI and pipelines), and short commands do not invent percentages before a total is known. A redirected `--output` JSON snapshot remains clean. Future long-running handlers can reuse `CliProgress` for real item counts.

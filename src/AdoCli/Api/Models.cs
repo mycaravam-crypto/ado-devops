@@ -135,7 +135,9 @@ public sealed record TestSuite(int Id, string Name, string? SuiteType, IdRef? Pa
 public sealed record SuiteTestCase(IdRef TestCase);
 
 /// <summary>A test point is one test case in a suite and configuration, with its latest outcome.</summary>
-public sealed record TestPointInfo(int Id, IdRef? TestCase, IdRef? Configuration, string? Outcome, string? State);
+public sealed record TestPointInfo(int Id, TestPointCaseRef? TestCase, System.Text.Json.JsonElement? Configuration, string? Outcome, string? State);
+/// <summary>Legacy test points encode test-case IDs as JSON strings, unlike suite case references.</summary>
+public sealed record TestPointCaseRef(string Id);
 
 public sealed record TestRunInfo(int Id, DateTimeOffset? StartedDate, DateTimeOffset? CompletedDate);
 public sealed record TestResultInfo(int Id, IdRef? TestCase, string? Outcome, string? State, string? ErrorMessage);

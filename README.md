@@ -402,6 +402,7 @@ ado testplan show 12 --with results              # actual outcomes from test run
 ado testplan show 12 --with all --json           # detailed machine-readable view
 ado testplan export 12 --output plan.json         # without --output: JSON on stdout
 ado testplan export 12 --format html --output plan.html # offline, read-only HTML report
+ado testplan coverage 12 --area "Product\\ALPHA" --format html --output coverage.html
 ado testplan import plan.json --dry-run           # what would change; writes nothing
 ado testplan import plan.json                     # asks before updating several test cases (--yes skips that)
 ```
@@ -411,6 +412,8 @@ Suites are shown in a stable hierarchy; test cases assigned to several suites co
 Use `export` when you need a portable edit/import document. In `show`, expected results are part of the test case definition; `--with results` instead reads actual outcomes from test runs. An absent run is not a passing test. All modes are read-only.
 
 HTML is a self-contained, read-only report with suite navigation and tables of actions and expected results. Import continues to use JSON only.
+
+Coverage uses requirements (User Story, Product Backlog Item, Requirement) in the given Area Path including descendants, linked to cases within the selected plan. It reports requirement coverage, execution coverage (Passed/Failed/Aborted), and pass rate separately. The latest available result per case is used. No results means not executed. A zero denominator displays 0%. The command is read-only.
 
 ### The file
 

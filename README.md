@@ -413,7 +413,27 @@ Use `export` when you need a portable edit/import document. In `show`, expected 
 
 HTML is a self-contained, read-only report with suite navigation and tables of actions and expected results. Import continues to use JSON only.
 
-Coverage uses requirements (User Story, Product Backlog Item, Requirement) in the given Area Path including descendants, linked to cases within the selected plan. It reports requirement coverage, execution coverage (Passed/Failed/Aborted), and pass rate separately. The latest available result per case is used. No results means not executed. A zero denominator displays 0%. The command is read-only.
+### Test coverage by Area Path
+
+`ado testplan coverage <id> --area <path>` produces a read-only report for **one** test plan and software area (including child Area Paths). This keeps historically different software projects such as ALPHA and GAMMA separate even if their code shares one repository and uses different branches. Git branches do not affect the calculation.
+
+```bash
+ado testplan coverage 12 --area "Product\\ALPHA"                         # text and uncovered requirements
+ado testplan coverage 12 --area "Product\\ALPHA" --format json             # machine-readable
+ado testplan coverage 12 --area "Product\\ALPHA" --format html --output coverage.html
+```
+
+Requirements are Azure DevOps work items of type `User Story`, `Product Backlog Item` or `Requirement`, across **all states**. A requirement counts as covered when its `Tests` / `Tested By` relation targets at least one test case assigned to a suite in the selected plan. The same test case in several suites counts once. The HTML report lists uncovered requirements.
+
+| Measure | Numerator / denominator |
+| --- | --- |
+| Requirement coverage | Requirements linked to at least one test case in the plan / requirements in the Area Path |
+| Execution coverage | Planned test cases whose latest recorded plan result is Passed, Failed or Aborted / distinct test cases in the plan |
+| Pass rate | Planned test cases with latest result Passed / executed test cases (as defined above) |
+
+Test results come from runs belonging to the selected plan; the latest available result per test case is used. `Blocked`, `NotExecuted` and missing results do **not** count as executed or passed. A zero denominator is reported as 0%. Coverage is **not** code coverage, and requirement coverage does not prove test quality or execution success.
+
+The command is read-only. HTML reports are standalone and offline-viewable; JSON remains the editable format for `testplan export` / `import`.
 
 ### The file
 

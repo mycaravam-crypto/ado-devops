@@ -82,4 +82,24 @@ public class TestPlanHtmlTests
         Assert.Contains("Input accepted", TestPlanHtml.Render(file, shared));
     }
 
+    [Fact]
+    public void SidebarMatchesDocWizzNavigationPatterns()
+    {
+        var file = new TestPlanFile(TestPlanFile.CurrentFormat, "Project",
+            new PlanInfo(1, "Plan", "Active", null, 10),
+            [
+                new SuiteInfo(10, "Root", "StaticTestSuite", null, [42]),
+                new SuiteInfo(11, "Nested", "StaticTestSuite", 10, [42]),
+            ],
+            [new TestCaseEntry(42, 1, "Case", null, [])]);
+        var html = TestPlanHtml.Render(file);
+        Assert.Contains("id=\"site-nav\"", html);
+        Assert.Contains("id=\"side-filter\"", html);
+        Assert.Contains("<details open><summary>", html);
+        Assert.Contains("href=\"#suite-11\"", html);
+        Assert.Contains("aria-current", html);
+        Assert.Contains("id=\"nav-toggle\"", html);
+        Assert.Contains("No suites match.", html);
+    }
+
 }

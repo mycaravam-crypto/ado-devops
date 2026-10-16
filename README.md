@@ -388,6 +388,8 @@ ado workitem search 4711       # the work item with that id first, then titles c
   `candidates.truncated` is true, the server had more candidates than 500 and a match may be missing; make the query
   more specific or narrow it down. `match: "candidate"` means similar text, not a verified link.
 
+`ado testplan trace-export <id> --area "Product\\ALPHA" --output alpha-tests.json` creates a read-only `ado.test-traceability/v1` snapshot for offline DocWizz import. Includes requirement IDs, explicit links to in-plan test-case IDs, suite assignments, and scope metadata. It omits steps, parameters and test execution evidence by design.
+
 ## Test plans
 
 Export a test plan to one JSON file, edit test cases, steps and expected results in it — one or hundreds at once,

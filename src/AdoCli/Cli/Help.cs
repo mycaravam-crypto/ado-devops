@@ -230,6 +230,7 @@ public static class Help
                                         as JSON to stdout
               --format json|html        JSON for edit/import (default), HTML for offline viewing
               --with-results           include point-based progress in HTML (HTML only)
+              --exclude-parameters     omit parameter values/definitions in HTML only
               --area <path>            optional area filter for HTML progress
               --output <file>           write to this file instead
           ado testplan coverage <id>   requirement and execution coverage for one Area Path

@@ -14,7 +14,7 @@ public static class TestPlanHtml
         @"\s+", " ").Trim();
     static string Label(string? value) => E(Plain(value));
 
-    public static string Render(TestPlanFile file)
+    public static string Render(TestPlanFile file, IReadOnlyDictionary<int, IReadOnlyList<TestStep>>? sharedSteps = null, IReadOnlyDictionary<int, string>? sharedErrors = null)
     {
         var plan = file.Plan ?? throw new ArgumentException("Missing plan.");
         var suites = file.Suites ?? [];
@@ -84,6 +84,7 @@ public static class TestPlanHtml
                 if (c.Fields?.GetValueOrDefault("System.State") is { Length: > 0 } state)
                     sb.Append(" <span class=\"badge\">").Append(E(state)).Append("</span>");
                 sb.AppendLine("<div class=\"table-wrap\"><table><thead><tr><th>#</th><th>Action</th><th>Expected result</th></tr></thead><tbody>");
+                var activeShared = new HashSet<int>();
                 void Steps(IEnumerable<TestStep> steps, string prefix)
                 {
                     var n = 0;
@@ -95,7 +96,19 @@ public static class TestPlanHtml
                         if (step.SharedStepsId is { } shared)
                         {
                             sb.Append("Shared steps #").Append(shared).Append("</td><td class=\"muted\">Referenced shared steps</td></tr>");
-                            if (step.Steps is { Count: > 0 }) Steps(step.Steps, number + ".");
+                            if (sharedErrors is not null && sharedErrors.TryGetValue(shared, out var error))
+                                sb.Append("<tr><td></td><td colspan=\"2\" class=\"empty\">").Append(E(error)).AppendLine("</td></tr>");
+                            else if (sharedSteps is not null && sharedSteps.TryGetValue(shared, out var expanded))
+                            {
+                                if (!activeShared.Add(shared))
+                                    sb.AppendLine("<tr><td></td><td colspan=\"2\" class=\"empty\">Circular shared steps reference</td></tr>");
+                                else
+                                {
+                                    Steps(expanded, number + ".");
+                                    activeShared.Remove(shared);
+                                }
+                            }
+                            else if (step.Steps is { Count: > 0 }) Steps(step.Steps, number + ".");
                         }
                         else
                         {

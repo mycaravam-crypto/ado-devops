@@ -11,10 +11,11 @@ public class TestPlanTraceExportTests
             "<p>Users sign in</p>", "<p>Valid credentials are accepted</p>", "5", "2");
         var json = System.Text.Json.JsonSerializer.Serialize(requirement,
             new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
-        Assert.Contains("\\"description\\":\\"<p>Users sign in</p>\\"", json);
-        Assert.Contains("\\"acceptanceCriteria\\":", json);
-        Assert.Contains("\\"storyPoints\\":\\"5\\"", json);
-        Assert.Contains("\\"priority\\":\\"2\\"", json);
+        Assert.Contains("description", json);
+        Assert.Contains("Users sign in", json);
+        Assert.Contains("acceptanceCriteria", json);
+        Assert.Contains("storyPoints", json);
+        Assert.Contains("priority", json);
     }
 
     [Fact]

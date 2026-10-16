@@ -402,6 +402,7 @@ ado testplan show 12 --with results              # actual outcomes from test run
 ado testplan show 12 --with all --json           # detailed machine-readable view
 ado testplan export 12 --output plan.json         # without --output: JSON on stdout
 ado testplan export 12 --format html --output plan.html # offline, read-only HTML report
+ado testplan coverage 12 --area "Product\\ALPHA" --format html --output coverage.html
 ado testplan import plan.json --dry-run           # what would change; writes nothing
 ado testplan import plan.json                     # asks before updating several test cases (--yes skips that)
 ```
@@ -412,6 +413,28 @@ Use `export` when you need a portable edit/import document. In `show`, expected 
 
 HTML is a self-contained, read-only report with suite navigation and tables of actions and expected results. Import continues to use JSON only.
 Shared Steps references are resolved recursively in the HTML report from the referenced work item's `Microsoft.VSTS.TCM.Steps` field. Custom or localized work-item type names are supported; the export does not require the literal type name `Shared Steps`. A missing/inaccessible reference or empty steps field is shown as a warning in the report. Cyclic references are detected. The original shared-step references remain unchanged in JSON exports and imports.
+
+### Test coverage by Area Path
+
+`ado testplan coverage <id> --area <path>` produces a read-only report for **one** test plan and software area (including child Area Paths). This keeps historically different software projects such as ALPHA and GAMMA separate even if their code shares one repository and uses different branches. Git branches do not affect the calculation.
+
+```bash
+ado testplan coverage 12 --area "Product\\ALPHA"                         # text and uncovered requirements
+ado testplan coverage 12 --area "Product\\ALPHA" --format json             # machine-readable
+ado testplan coverage 12 --area "Product\\ALPHA" --format html --output coverage.html
+```
+
+Requirements are Azure DevOps work items of type `User Story`, `Product Backlog Item` or `Requirement`, across **all states**. A requirement counts as covered when its `Tests` / `Tested By` relation targets at least one test case assigned to a suite in the selected plan. The same test case in several suites counts once. The HTML report lists uncovered requirements.
+
+| Measure | Numerator / denominator |
+| --- | --- |
+| Requirement coverage | Requirements linked to at least one test case in the plan / requirements in the Area Path |
+| Execution coverage | Planned test cases whose latest recorded plan result is Passed, Failed or Aborted / distinct test cases in the plan |
+| Pass rate | Planned test cases with latest result Passed / executed test cases (as defined above) |
+
+Test results come from runs belonging to the selected plan; the latest available result per test case is used. `Blocked`, `NotExecuted` and missing results do **not** count as executed or passed. A zero denominator is reported as 0%. Coverage is **not** code coverage, and requirement coverage does not prove test quality or execution success.
+
+The command is read-only. HTML reports are standalone and offline-viewable; JSON remains the editable format for `testplan export` / `import`.
 
 ### The file
 

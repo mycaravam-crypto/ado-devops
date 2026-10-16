@@ -91,6 +91,7 @@ public static class Program
             ("testplan", "show") => TestPlanCommands.ShowAsync(ctx),
             ("testplan", "export") => TestPlanCommands.ExportAsync(ctx),
             ("testplan", "import") => TestPlanCommands.ImportAsync(ctx),
+            ("testplan", "coverage") => TestPlanCoverage.RunAsync(ctx),
             ("build", "list") => BuildCommands.ListAsync(ctx),
             ("build", "show") => BuildCommands.ShowAsync(ctx),
             ("build", "run") => BuildCommands.RunAsync(ctx),

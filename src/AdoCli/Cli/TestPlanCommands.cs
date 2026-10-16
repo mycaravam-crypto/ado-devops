@@ -12,6 +12,7 @@ public static class TestPlanCommands
     [
         "System.State", "System.AssignedTo", "System.AreaPath", "System.IterationPath", "System.Tags",
         "Microsoft.VSTS.Common.Priority", "System.Description",
+        "Microsoft.VSTS.TCM.Parameters", "Microsoft.VSTS.TCM.LocalDataSource",
     ];
 
     const string Title = "System.Title";

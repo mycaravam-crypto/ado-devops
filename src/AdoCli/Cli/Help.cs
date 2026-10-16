@@ -17,7 +17,7 @@ public static class Help
           pr        list, show, context, diff, checkout, create, approve, merge
           commit    context
           workitem  list, show, create, edit
-          testplan  list, show, export, import, coverage, progress
+          testplan  list, show, export, import, coverage, progress, trace-export
           build     list, show, run
 
         Inside a cloned Azure DevOps repository, project and repository are detected
@@ -242,6 +242,9 @@ public static class Help
               --days 14|30             run history window (default: 14)
               --format text|json|html   default: text
               --output <file>          write output to file
+          ado testplan trace-export <id>  JSON snapshot for DocWizz (requires --area)
+              --area <path>            required; includes subareas
+              --output <file>          save JSON instead of stdout
           ado testplan import <file>    update the test cases edited in the file
               --dry-run                 show what would change, change nothing
               --yes, -y                 do not ask before updating several test cases

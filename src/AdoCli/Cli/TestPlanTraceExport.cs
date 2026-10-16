@@ -9,7 +9,25 @@ public static class TestPlanTraceExport
     /// <summary>A case assigned to one or more suites, without steps or parameter values.</summary>
     public sealed record Case(int Id, string Title, string Area, int[] SuiteIds);
     /// <summary>A requirement and its explicitly linked test cases in the selected plan.</summary>
-    public sealed record Requirement(int Id, string Title, int[] TestCaseIds);
+    public sealed record Requirement(int Id, string Title, int[] TestCaseIds,
+        string? Description = null, string? AcceptanceCriteria = null,
+        string? StoryPoints = null, string? Priority = null);
+
+    // Work item process templates may name their estimation field StoryPoints, Effort, or Size.
+    static Requirement Describe(WorkItem item, int[] linked)
+    {
+        static string? Field(WorkItem item, params string[] names)
+        {
+            foreach (var name in names)
+                if (item.Field(name) is { Length: > 0 } value) return value;
+            return null;
+        }
+        return new(item.Id, item.Field("System.Title"), linked,
+            Field(item, "System.Description"),
+            Field(item, "Microsoft.VSTS.Common.AcceptanceCriteria"),
+            Field(item, "Microsoft.VSTS.Scheduling.StoryPoints", "Microsoft.VSTS.Scheduling.Effort", "Microsoft.VSTS.Scheduling.Size"),
+            Field(item, "Microsoft.VSTS.Common.Priority"));
+    }
     /// <summary>Versioned, read-only snapshot; results are current point outcomes, not historical coverage.</summary>
     public sealed record Snapshot(string Format, string Project, string Area, DateTimeOffset GeneratedAt,
         int PlanId, string PlanName, Case[] TestCases, Requirement[] Requirements);
@@ -44,7 +62,7 @@ public static class TestPlanTraceExport
             var linked = (item.Relations ?? []).Where(TestPlanCoverage.IsTestLink)
                 .Select(r => TestPlanCoverage.LinkedId(r.Url)).OfType<int>()
                 .Where(caseIds.Contains).Distinct().Order().ToArray();
-            requirements.Add(new(id, item.Field("System.Title"), linked));
+            requirements.Add(Describe(item, linked));
         }
         return new("ado.test-traceability/v1", project, area, DateTimeOffset.UtcNow,
             planId, plan.Name, records, requirements.ToArray());
@@ -91,7 +109,7 @@ public static class TestPlanTraceExport
             var linked = (item.Relations ?? []).Where(TestPlanCoverage.IsTestLink)
                 .Select(r => TestPlanCoverage.LinkedId(r.Url)).OfType<int>()
                 .Where(selectedIds.Contains).Distinct().Order().ToArray();
-            requirements.Add(new(id, item.Field("System.Title"), linked));
+            requirements.Add(Describe(item, linked));
         }
         return new("ado.test-traceability/v2", project, area, DateTimeOffset.UtcNow,
             includedPlans, cases, memberships, requirements.ToArray());

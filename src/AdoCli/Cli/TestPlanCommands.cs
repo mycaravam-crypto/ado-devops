@@ -172,7 +172,14 @@ public static class TestPlanCommands
         if (format is not ("json" or "html"))
             throw AdoException.Usage("--format must be json or html");
         var file = await ExportAsync(ctx.Client, ctx.RequireProject(), ctx.Id("testplan export <id> [--format json|html] [--output file]"));
-        var json = format == "html" ? TestPlanHtml.Render(file) : file.Write();
+        string json;
+        if (format == "html")
+        {
+            var (shared, errors) = await ResolveSharedStepsAsync(ctx.Client, file);
+            json = TestPlanHtml.Render(file, shared, errors);
+        }
+        else
+            json = file.Write();
         if (ctx.Args.Get("--output") is { } path)
         {
             File.WriteAllText(path, json);
@@ -181,6 +188,46 @@ public static class TestPlanCommands
         else
             Console.Write(json);
         return 0;
+    }
+
+    /// <summary>Loads referenced Shared Steps work items once; HTML only, never changes JSON round-tripping.</summary>
+    public static async Task<(Dictionary<int, IReadOnlyList<TestStep>> Steps, Dictionary<int, string> Errors)>
+        ResolveSharedStepsAsync(AdoClient client, TestPlanFile file)
+    {
+        var resolved = new Dictionary<int, IReadOnlyList<TestStep>>();
+        var errors = new Dictionary<int, string>();
+        var pending = new Queue<int>();
+        void Enqueue(IEnumerable<TestStep> steps)
+        {
+            foreach (var step in steps)
+            {
+                if (step.SharedStepsId is { } id && !resolved.ContainsKey(id) && !errors.ContainsKey(id))
+                    pending.Enqueue(id);
+                if (step.Steps is { } nested) Enqueue(nested);
+            }
+        }
+        foreach (var testCase in file.TestCases ?? []) Enqueue(testCase.Steps ?? []);
+        while (pending.TryDequeue(out var id))
+        {
+            if (resolved.ContainsKey(id) || errors.ContainsKey(id)) continue;
+            try
+            {
+                var item = await client.GetWorkItemAsync(id);
+                if (item.Field(Type) != "Shared Steps")
+                {
+                    errors[id] = $"Work item #{id} is not Shared Steps";
+                    continue;
+                }
+                var steps = StepsOf(item).Steps;
+                resolved[id] = steps;
+                Enqueue(steps);
+            }
+            catch (AdoException ex)
+            {
+                errors[id] = $"Shared steps #{id} unavailable: {ex.Message}";
+            }
+        }
+        return (resolved, errors);
     }
 
     /// <summary>Reads the plan, its suites, the test cases of each suite and every test case once, with its steps.</summary>

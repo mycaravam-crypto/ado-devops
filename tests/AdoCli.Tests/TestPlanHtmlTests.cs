@@ -30,4 +30,29 @@ public class TestPlanHtmlTests
         Assert.Equal(2, html.Split("Login &amp; verify").Length - 1);
         Assert.Contains("Expected result", html);
     }
+    [Fact]
+    public void ExpandsNestedSharedStepsAndReportsCyclesAndMissingItems()
+    {
+        var file = new TestPlanFile(TestPlanFile.CurrentFormat, "Project",
+            new PlanInfo(1, "Plan", "Active", null, 2),
+            [new SuiteInfo(2, "Suite", "StaticTestSuite", null, [3])],
+            [new TestCaseEntry(3, 1, "Case", null, [new TestStep(1, SharedStepsId: 5366)])]);
+        Dictionary<int, IReadOnlyList<TestStep>> shared = new()
+        {
+            [5366] = [new TestStep(2, Action: "Prepare", ExpectedResult: "Ready"),
+                       new TestStep(3, SharedStepsId: 6045)],
+            [6045] = [new TestStep(4, Action: "Verify", ExpectedResult: "Success"),
+                       new TestStep(5, SharedStepsId: 5366)],
+        };
+        var html = TestPlanHtml.Render(file, shared);
+        Assert.Contains("1.1", html);
+        Assert.Contains("1.2.1", html);
+        Assert.Contains("Verify", html);
+        Assert.Contains("Success", html);
+        Assert.Contains("Circular shared steps reference", html);
+
+        var errors = new Dictionary<int, string> { [5366] = "Shared steps #5366 not found" };
+        Assert.Contains("Shared steps #5366 not found", TestPlanHtml.Render(file, shared, errors));
+    }
+
 }

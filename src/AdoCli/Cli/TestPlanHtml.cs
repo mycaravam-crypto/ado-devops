@@ -14,6 +14,7 @@ public static class TestPlanHtml
         @"\s+", " ").Trim();
     static string Label(string? value) => E(Plain(value));
 
+    /// <summary>Renders the complete offline test plan report, optionally including resolved Shared Steps and test progress.</summary>
     public static string Render(TestPlanFile file, IReadOnlyDictionary<int, IReadOnlyList<TestStep>>? sharedSteps = null, IReadOnlyDictionary<int, string>? sharedErrors = null, TestPlanProgress.Report? progress = null)
     {
         var plan = file.Plan ?? throw new ArgumentException("Missing plan.");

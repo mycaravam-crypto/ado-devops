@@ -45,14 +45,14 @@ public static class TestPlanProgress
         if (!string.IsNullOrWhiteSpace(area))
         {
             var ids = pointSets.SelectMany(p => p.Points).Where(p => p.TestCase is not null)
-                .Select(p => p.TestCase!.Id).Distinct().ToArray();
+                .Select(p => CaseId(p)).Where(id => id > 0).Distinct().ToArray();
             var items = await client.GetWorkItemsAsync(ids, ["System.AreaPath"]);
             selectedCases = items.Where(w => InsideArea(w.Field("System.AreaPath"), area))
                 .Select(w => w.Id).ToHashSet();
         }
         var relevant = pointSets.Select(p => (p.Suite,
             Points: p.Points.Where(x => x.TestCase is not null
-                && (selectedCases is null || selectedCases.Contains(x.TestCase.Id))).ToList())).ToList();
+                && (selectedCases is null || selectedCases.Contains(CaseId(x)))).ToList())).ToList();
         var entries = relevant.SelectMany(p => p.Points.Select(x => (p.Suite.Id, Point: x)))
             .DistinctBy(x => (x.Id, x.Point.Id)).ToList();
         int Count(string outcome) => entries.Count(p => Outcome(p.Point.Outcome) == outcome);
@@ -64,7 +64,7 @@ public static class TestPlanProgress
 
         var cutoff = DateTimeOffset.UtcNow.AddDays(-days);
         var trend = new Dictionary<DateOnly, (int Passed, int Failed, int Other)>();
-        var validCases = entries.Select(e => e.Point.TestCase!.Id).ToHashSet();
+        var validCases = entries.Select(e => CaseId(e.Point)).ToHashSet();
         foreach (var run in await client.GetTestRunsAsync(project, planId))
         {
             var date = run.CompletedDate ?? run.StartedDate;
@@ -87,6 +87,9 @@ public static class TestPlanProgress
             Count("Blocked"), Count("NotRun"), bySuite,
             trend.OrderBy(x => x.Key).Select(x => new DailyResults(x.Key, x.Value.Passed, x.Value.Failed, x.Value.Other)).ToList());
     }
+
+    /// <summary>Reads a test case ID from the legacy test point response safely.</summary>
+    public static int CaseId(TestPointInfo point) => int.TryParse(point.TestCase?.Id, out var id) ? id : 0;
 
     /// <summary>Matches an exact Area Path or one of its descendants, without matching similarly prefixed areas.</summary>
     public static bool InsideArea(string path, string area) =>

@@ -30,6 +30,8 @@ public static class TestPlanHtml
             <title>Test plan report</title>
             <style>
             :root{--canvas:#f3f5f8;--surface:#fff;--surface-soft:#f8fafc;--ink:#172334;--text:#344457;--muted:#5c6b7e;--line:#dce2eb;--accent:#235bbd;--accent-soft:#e9f0fd;--shadow:0 2px 5px #1221370a,0 14px 44px #1221370b;--header-height:68px}
+            :root[data-theme="dark"]{color-scheme:dark;--canvas:#101620;--surface:#192331;--surface-soft:#202d3d;--ink:#f1f5fb;--text:#d2ddeb;--muted:#a3b3c6;--line:#35465a;--accent:#8eb7ff;--accent-soft:#253b59;--shadow:0 12px 42px #0003}
+            @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--canvas:#101620;--surface:#192331;--surface-soft:#202d3d;--ink:#f1f5fb;--text:#d2ddeb;--muted:#a3b3c6;--line:#35465a;--accent:#8eb7ff;--accent-soft:#253b59;--shadow:0 12px 42px #0003}}
             *{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:90px}body{margin:0;color:var(--text);background:var(--canvas);font:15px/1.7 system-ui,-apple-system,Segoe UI,sans-serif}
             button,input{font:inherit}button{cursor:pointer}a{color:var(--accent)}a:hover{color:#174a9c}:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
             header{position:sticky;top:0;z-index:30;min-height:var(--header-height);display:flex;align-items:center;gap:14px;padding:10px clamp(16px,2.5vw,36px);background:var(--surface);border-bottom:1px solid var(--line)}
@@ -56,7 +58,7 @@ public static class TestPlanHtml
             @media(max-width:900px){#nav-toggle{display:inline-flex;align-items:center;justify-content:center}.layout{display:block;padding:16px}.side{display:none;position:fixed;z-index:45;top:var(--header-height);bottom:0;left:0;width:min(85vw,340px);max-height:none;padding:20px;background:var(--surface);border-right:1px solid var(--line);box-shadow:10px 0 24px #0002}body[data-nav-open="true"] .side{display:block}#nav-close{display:inline-flex;align-items:center;justify-content:center}main{width:100%}}
             @media(max-width:580px){header{padding:10px 13px}.header-label{display:none}.layout{padding:0 0 36px}main{border:0;border-radius:0;box-shadow:none;padding:24px 16px}}
             @media print{header,.side{display:none!important}.layout{display:block;padding:0}main{border:0;box-shadow:none;padding:0}.case{break-inside:avoid}}
-            </style></head><body><header><button id="nav-toggle" class="icon-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Open navigation">☰</button><div class="brand"><span class="brand-mark">TP</span><span>Test Plans</span></div><span class="header-label">Azure DevOps · Report</span></header><div class="layout"><nav class="side" id="site-nav" aria-label="Test suites"><div class="side-top">Explore <button id="nav-close" class="icon-button" type="button" aria-label="Close navigation">×</button></div><div class="filter-wrap"><input id="side-filter" type="search" placeholder="Filter suites..." aria-label="Filter suites"></div><p id="side-empty" class="side-empty" hidden>No suites match.</p><ul>
+            </style></head><body><header><button id="nav-toggle" class="icon-button" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Open navigation">☰</button><div class="brand"><span class="brand-mark">TP</span><span>Test Plans</span></div><span class="header-label">Azure DevOps · Report</span><button id="theme-toggle" class="icon-button" type="button" aria-label="Switch theme" title="Switch theme" style="margin-left:auto">☾</button></header><div class="layout"><nav class="side" id="site-nav" aria-label="Test suites"><div class="side-top">Explore <button id="nav-close" class="icon-button" type="button" aria-label="Close navigation">×</button></div><div class="filter-wrap"><input id="side-filter" type="search" placeholder="Filter suites..." aria-label="Filter suites"></div><p id="side-empty" class="side-empty" hidden>No suites match.</p><ul>
             """);
         void Nav(SuiteInfo suite)
         {
@@ -175,6 +177,28 @@ public static class TestPlanHtml
             </main></div>
             <script>
             (() => {
+              const root = document.documentElement;
+              const themeButton = document.getElementById('theme-toggle');
+              const themeKey = 'ado.testplan.theme';
+              try {
+                const stored = localStorage.getItem(themeKey);
+                if (stored === 'light' || stored === 'dark') root.dataset.theme = stored;
+              } catch (_) { /* file:// storage may be disabled */ }
+              const isDark = () => root.dataset.theme === 'dark' ||
+                (!root.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
+              const updateThemeLabel = () => {
+                const dark = isDark();
+                themeButton.textContent = dark ? '☀' : '☾';
+                themeButton.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+                themeButton.title = themeButton.getAttribute('aria-label');
+              };
+              themeButton.addEventListener('click', () => {
+                root.dataset.theme = isDark() ? 'light' : 'dark';
+                try { localStorage.setItem(themeKey, root.dataset.theme); } catch (_) { /* optional */ }
+                updateThemeLabel();
+              });
+              matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', updateThemeLabel);
+              updateThemeLabel();
               const nav = document.getElementById('site-nav');
               const toggle = document.getElementById('nav-toggle');
               const close = document.getElementById('nav-close');

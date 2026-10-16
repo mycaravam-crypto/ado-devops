@@ -83,6 +83,31 @@ public static class TestPlanHtml
                     .Append(c.Id).Append(" · Revision ").Append(c.Rev).Append("</small>");
                 if (c.Fields?.GetValueOrDefault("System.State") is { Length: > 0 } state)
                     sb.Append(" <span class=\"badge\">").Append(E(state)).Append("</span>");
+                if (c.Fields?.GetValueOrDefault("System.AreaPath") is { Length: > 0 } area)
+                    sb.Append("<p class=\"muted\">Area Path: ").Append(E(area)).AppendLine("</p>");
+                if (c.Fields?.GetValueOrDefault("Microsoft.VSTS.TCM.Parameters") is { Length: > 0 } definitions)
+                    sb.Append("<p class=\"muted\">Parameters: ").Append(Label(definitions)).AppendLine("</p>");
+                if (c.Fields?.GetValueOrDefault("Microsoft.VSTS.TCM.LocalDataSource") is { Length: > 0 } source)
+                {
+                    var rows = TestPlanParameters.Rows(source);
+                    if (rows.Count > 0)
+                    {
+                        var columns = rows.SelectMany(row => row.Keys).Distinct().ToList();
+                        sb.AppendLine("<h4>Parameter values</h4><div class=\"table-wrap\"><table><thead><tr>");
+                        foreach (var col in columns) sb.Append("<th>").Append(E(col)).Append("</th>");
+                        sb.AppendLine("</tr></thead><tbody>");
+                        foreach (var row in rows)
+                        {
+                            sb.Append("<tr>");
+                            foreach (var col in columns)
+                                sb.Append("<td>").Append(E(row.GetValueOrDefault(col))).Append("</td>");
+                            sb.AppendLine("</tr>");
+                        }
+                        sb.AppendLine("</tbody></table></div>");
+                    }
+                    else
+                        sb.AppendLine("<p class=\"muted\">Parameter data present (not a supported table format).</p>");
+                }
                 sb.AppendLine("<div class=\"table-wrap\"><table><thead><tr><th>#</th><th>Action</th><th>Expected result</th></tr></thead><tbody>");
                 var activeShared = new HashSet<int>();
                 void Steps(IEnumerable<TestStep> steps, string prefix)

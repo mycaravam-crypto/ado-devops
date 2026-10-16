@@ -286,6 +286,7 @@ public sealed class AdoClient
             .ThenByDescending(r => r.Id).ToList();
     }
 
+    /// <summary>Returns all execution results for a test run, paging through the legacy Test API.</summary>
     public Task<List<TestResultInfo>> GetRunResultsAsync(string project, int runId) =>
         PageAsync<TestResultInfo>(project, $"test/runs/{runId}/results", "", null,
             apiVersion: LegacyTestApiVersion);

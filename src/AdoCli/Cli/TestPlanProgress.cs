@@ -122,6 +122,14 @@ public static class TestPlanProgress
         return sb.Append("</tbody></table></div></section>").ToString();
     }
 
+    /// <summary>Reuses the established DocWizz-style report shell (sidebar, responsive navigation, dark mode).</summary>
+    public static async Task<string> RenderStandaloneHtmlAsync(AdoClient client, string project, int planId, Report report)
+    {
+        var file = await TestPlanCommands.ExportAsync(client, project, planId);
+        var (shared, errors) = await TestPlanCommands.ResolveSharedStepsAsync(client, file);
+        return TestPlanHtml.Render(file, shared, errors, report);
+    }
+
     /// <summary>Runs the testplan progress CLI and optionally writes an offline HTML report.</summary>
     public static async Task<int> RunAsync(Context ctx)
     {
@@ -136,7 +144,7 @@ public static class TestPlanProgress
         var output = format switch
         {
             "json" => JsonSerializer.Serialize(report, Json.Options) + "\n",
-            "html" => "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Test progress</title><style>body{font:15px/1.6 system-ui;max-width:1100px;margin:40px auto;padding:0 20px;color:#172334}table{width:100%;border-collapse:collapse}td,th{padding:10px;border-bottom:1px solid #ddd;text-align:left}.meta{display:flex;gap:12px;flex-wrap:wrap}.meta span{padding:8px;background:#eef2f6}</style></head><body><h1>" + WebUtility.HtmlEncode(report.PlanName) + "</h1>" + Html(report) + "</body></html>",
+            "html" => await RenderStandaloneHtmlAsync(ctx.Client, ctx.RequireProject(), id, report),
             _ => $"Test plan #{report.PlanId}: {report.PlanName}\nArea: {report.Area ?? "all"}\n" +
                 $"Points: {report.Points} | Passed: {report.Passed} | Failed: {report.Failed} | Blocked: {report.Blocked} | Not Run: {report.NotRun}\n" +
                 $"Executed: {report.ExecutionPercent}% | Pass rate: {report.PassPercent}%\n"

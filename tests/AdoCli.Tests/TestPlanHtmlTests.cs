@@ -116,4 +116,24 @@ public class TestPlanHtmlTests
         Assert.Contains("ado.testplan.theme", html);
     }
 
+    [Fact]
+    public void HtmlCanExcludeSensitiveParameterFields()
+    {
+        var file = new TestPlanFile(TestPlanFile.CurrentFormat, "Project",
+            new PlanInfo(1, "Plan", "Active", null, 10),
+            [new SuiteInfo(10, "Root", "StaticTestSuite", null, [42])],
+            [new TestCaseEntry(42, 1, "Case", new Dictionary<string, string>
+            {
+                ["Microsoft.VSTS.TCM.Parameters"] = "password",
+                ["Microsoft.VSTS.TCM.LocalDataSource"] = "<NewDataSet><Table1><password>SECRET-SAMPLE-123</password></Table1></NewDataSet>"
+            }, [])]);
+        var regular = TestPlanHtml.Render(file);
+        var safe = TestPlanHtml.Render(file, excludeParameters: true);
+        Assert.Contains("SECRET-SAMPLE-123", regular);
+        Assert.DoesNotContain("SECRET-SAMPLE-123", safe);
+        Assert.DoesNotContain("Parameters: password", safe);
+        Assert.Contains("Generated (UTC):", safe);
+        Assert.Contains("Source: Azure DevOps", safe);
+    }
+
 }

@@ -15,17 +15,23 @@ public static class TestPlanTraceExport
         int PlanId, string PlanName, Case[] TestCases, Requirement[] Requirements);
 
     /// <summary>Collects cases and explicit TestedBy links without exporting sensitive step or parameter content.</summary>
-    public static async Task<Snapshot> BuildAsync(AdoClient client, string project, int planId, string area)
+    public static async Task<Snapshot> BuildAsync(AdoClient client, string project, int planId, string area, CliProgress? progress = null)
     {
+        progress?.Stage("load plan and suites");
         var plan = await client.GetTestPlanAsync(project, planId);
         var suites = await client.GetTestSuitesAsync(project, planId);
         var assignments = new Dictionary<int, List<int>>();
+        var suiteDone = 0;
         foreach (var suite in suites)
+        {
             foreach (var id in await client.GetSuiteTestCaseIdsAsync(project, planId, suite.Id))
             {
                 if (!assignments.TryGetValue(id, out var list)) assignments[id] = list = [];
                 if (!list.Contains(suite.Id)) list.Add(suite.Id);
             }
+            progress?.Report("suites", ++suiteDone, suites.Count);
+        }
+        progress?.Stage("load test cases");
         var cases = await client.GetWorkItemsAsync(assignments.Keys, ["System.Title", "System.AreaPath"]);
         var selected = cases.Where(c => TestPlanProgress.InsideArea(c.Field("System.AreaPath"), area))
             .OrderBy(c => c.Id).ToList();
@@ -38,13 +44,16 @@ public static class TestPlanTraceExport
             Types = ["Requirement", "User Story", "Product Backlog Item"]
         });
         var requirements = new List<Requirement>();
-        foreach (var id in ids.Distinct().Order())
+        var requirementIds = ids.Distinct().Order().ToArray();
+        var requirementDone = 0;
+        foreach (var id in requirementIds)
         {
             var item = await client.GetWorkItemWithRelationsAsync(id);
             var linked = (item.Relations ?? []).Where(TestPlanCoverage.IsTestLink)
                 .Select(r => TestPlanCoverage.LinkedId(r.Url)).OfType<int>()
                 .Where(caseIds.Contains).Distinct().Order().ToArray();
             requirements.Add(new(id, item.Field("System.Title"), linked));
+            progress?.Report("requirements", ++requirementDone, requirementIds.Length);
         }
         return new("ado.test-traceability/v1", project, area, DateTimeOffset.UtcNow,
             planId, plan.Name, records, requirements.ToArray());
@@ -59,14 +68,21 @@ public static class TestPlanTraceExport
         Plan[] Plans, Case[] TestCases, Assignment[] Assignments, Requirement[] Requirements);
 
     /// <summary>Collects all plan memberships and explicit requirement links for an Area Path; excludes steps and parameters.</summary>
-    public static async Task<MultiSnapshot> BuildAllAsync(AdoClient client, string project, string area)
+    public static async Task<MultiSnapshot> BuildAllAsync(AdoClient client, string project, string area, CliProgress? progress = null)
     {
+        progress?.Stage("list plans");
         var plans = await client.GetTestPlansAsync(project);
         var assignments = new List<Assignment>();
+        var planDone = 0;
         foreach (var plan in plans.OrderBy(p => p.Id))
-            foreach (var suite in await client.GetTestSuitesAsync(project, plan.Id))
+        {
+            var suites = await client.GetTestSuitesAsync(project, plan.Id);
+            foreach (var suite in suites)
                 foreach (var caseId in await client.GetSuiteTestCaseIdsAsync(project, plan.Id, suite.Id))
                     assignments.Add(new(plan.Id, suite.Id, caseId));
+            progress?.Report("plans", ++planDone, plans.Count);
+        }
+        progress?.Stage("load test cases");
         var ids = assignments.Select(a => a.TestCaseId).Distinct().ToArray();
         var workItems = await client.GetWorkItemsAsync(ids, ["System.Title", "System.AreaPath"]);
         var selected = workItems.Where(w => TestPlanProgress.InsideArea(w.Field("System.AreaPath"), area))
@@ -85,13 +101,16 @@ public static class TestPlanTraceExport
             Types = ["Requirement", "User Story", "Product Backlog Item"]
         });
         var requirements = new List<Requirement>();
-        foreach (var id in reqIds.Distinct().Order())
+        var requirementIds = reqIds.Distinct().Order().ToArray();
+        var requirementDone = 0;
+        foreach (var id in requirementIds)
         {
             var item = await client.GetWorkItemWithRelationsAsync(id);
             var linked = (item.Relations ?? []).Where(TestPlanCoverage.IsTestLink)
                 .Select(r => TestPlanCoverage.LinkedId(r.Url)).OfType<int>()
                 .Where(selectedIds.Contains).Distinct().Order().ToArray();
             requirements.Add(new(id, item.Field("System.Title"), linked));
+            progress?.Report("requirements", ++requirementDone, requirementIds.Length);
         }
         return new("ado.test-traceability/v2", project, area, DateTimeOffset.UtcNow,
             includedPlans, cases, memberships, requirements.ToArray());
@@ -105,9 +124,10 @@ public static class TestPlanTraceExport
             throw AdoException.Usage("testplan trace-export [id] --area <path> [--output file]");
         var area = ctx.Args.Get("--area");
         if (string.IsNullOrWhiteSpace(area)) throw AdoException.Usage("--area is required");
+        var progress = new CliProgress("testplan trace-export");
         object data = idText is null
-            ? await BuildAllAsync(ctx.Client, ctx.RequireProject(), area)
-            : await BuildAsync(ctx.Client, ctx.RequireProject(), int.Parse(idText), area);
+            ? await BuildAllAsync(ctx.Client, ctx.RequireProject(), area, progress)
+            : await BuildAsync(ctx.Client, ctx.RequireProject(), int.Parse(idText), area, progress);
         var json = JsonSerializer.Serialize(data, Json.Options) + "\n";
         if (ctx.Args.Get("--output") is { } file) File.WriteAllText(file, json);
         else Console.Write(json);

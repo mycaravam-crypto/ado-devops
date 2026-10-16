@@ -273,6 +273,10 @@ public sealed class AdoClient
         (await SendAsync<ListResponse<SuiteTestCase>>(HttpMethod.Get, Url(project, $"test/plans/{planId}/suites/{suiteId}/testcases", apiVersion: LegacyTestApiVersion)))
             .Value.Select(c => c.TestCase.Id).ToList();
 
+    /// <summary>Lists distinct test points of one suite, including each configuration and latest outcome, on legacy Test API.</summary>
+    public Task<List<TestPointInfo>> GetTestPointsAsync(string project, int planId, int suiteId) =>
+        PageAsync<TestPointInfo>(project, $"test/plans/{planId}/suites/{suiteId}/points", "", null, apiVersion: LegacyTestApiVersion);
+
     /// <summary>Test runs for a plan, ordered newest first for latest-result selection.</summary>
     public async Task<List<TestRunInfo>> GetTestRunsAsync(string project, int planId)
     {

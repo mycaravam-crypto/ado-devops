@@ -228,6 +228,7 @@ public static class Help
               --json                    structured output
           ado testplan export <id>      write the plan's suites and test cases, with their steps,
                                         as JSON to stdout
+              --format json|html        JSON for edit/import (default), HTML for offline viewing
               --output <file>           write to this file instead
           ado testplan import <file>    update the test cases edited in the file
               --dry-run                 show what would change, change nothing
@@ -242,6 +243,7 @@ public static class Help
           ado testplan list
           ado testplan show 12 --json
           ado testplan export 12 --output plan.json
+          ado testplan export 12 --format html --output plan.html
           ado testplan import plan.json --dry-run
           ado testplan import plan.json --yes
         """;

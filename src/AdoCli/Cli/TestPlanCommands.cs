@@ -212,7 +212,12 @@ public static class TestPlanCommands
             if (resolved.ContainsKey(id) || errors.ContainsKey(id)) continue;
             try
             {
-                var item = await client.GetWorkItemAsync(id);
+                var item = (await client.GetWorkItemsAsync([id], [Type, TestSteps.Field])).FirstOrDefault();
+                if (item is null)
+                {
+                    errors[id] = $"Shared steps #{id} not found or inaccessible";
+                    continue;
+                }
                 if (item.Field(Type) != "Shared Steps")
                 {
                     errors[id] = $"Work item #{id} is not Shared Steps";

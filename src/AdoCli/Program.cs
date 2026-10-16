@@ -93,6 +93,7 @@ public static class Program
             ("testplan", "import") => TestPlanCommands.ImportAsync(ctx),
             ("testplan", "coverage") => TestPlanCoverage.RunAsync(ctx),
             ("testplan", "progress") => TestPlanProgress.RunAsync(ctx),
+            ("testplan", "trace-export") => TestPlanTraceExport.RunAsync(ctx),
             ("build", "list") => BuildCommands.ListAsync(ctx),
             ("build", "show") => BuildCommands.ShowAsync(ctx),
             ("build", "run") => BuildCommands.RunAsync(ctx),

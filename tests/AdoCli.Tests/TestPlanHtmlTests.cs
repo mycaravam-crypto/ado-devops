@@ -61,7 +61,6 @@ public class TestPlanHtmlTests
     public async Task ResolvesSharedStepsRegardlessOfLocalizedWorkItemType(string type)
     {
         var xml = TestSteps.Build([new TestStep(1, "Enter username", "Input accepted")], 1);
-        var handler = new StubHandler(System.Net.HttpStatusCode.OK);
         var payload = System.Text.Json.JsonSerializer.Serialize(new
         {
             value = new[] { new { id = 5366, fields = new Dictionary<string, string>

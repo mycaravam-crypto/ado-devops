@@ -242,7 +242,7 @@ public static class Help
               --days 14|30             run history window (default: 14)
               --format text|json|html   default: text
               --output <file>          write output to file
-          ado testplan trace-export <id>  JSON snapshot for DocWizz (requires --area)
+          ado testplan trace-export [id]  all matching plans (v2); optional id for one plan (v1)
               --area <path>            required; includes subareas
               --output <file>          save JSON instead of stdout
           ado testplan import <file>    update the test cases edited in the file

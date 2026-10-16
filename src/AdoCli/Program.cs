@@ -51,15 +51,18 @@ public static class Program
     }
 
     /// <summary>Dispatches &lt;command&gt; &lt;subcommand&gt; to its handler; --help and --version need no configuration.</summary>
-    public static Task<int> RunAsync(Args a)
+    public static async Task<int> RunAsync(Args a)
     {
         if (a.Has("--version"))
-            return Print($"ado {Version}");
+            return await Print($"ado {Version}");
         if (HelpPage(a) is { } page)
-            return Print(page);
+            return await Print(page);
 
         var ctx = new Context(a);
-        return (a.At(0), a.At(1)) switch
+        var command = $"{a.At(0)} {a.At(1)}";
+        var progress = new CliProgress(command);
+        progress.Stage("running");
+        var result = await ((a.At(0), a.At(1)) switch
         {
             ("auth", "login") => AuthCommands.LoginAsync(ctx),
             ("auth", "status") => AuthCommands.StatusAsync(ctx),
@@ -98,7 +101,9 @@ public static class Program
             ("build", "show") => BuildCommands.ShowAsync(ctx),
             ("build", "run") => BuildCommands.RunAsync(ctx),
             _ => throw AdoException.Usage($"unknown command '{string.Join(' ', a.Positional.Take(2))}'. Run '{(Help.For(a.At(0)) is null ? "ado" : $"ado {a.At(0)}")} --help'."),
-        };
+        });
+        progress.Stage(result == 0 ? "complete" : "finished with errors");
+        return result;
     }
 
     /// <summary>

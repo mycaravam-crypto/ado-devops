@@ -401,6 +401,7 @@ ado testplan show 12 --with details              # suite cases, steps and expect
 ado testplan show 12 --with results              # actual outcomes from test runs
 ado testplan show 12 --with all --json           # detailed machine-readable view
 ado testplan export 12 --output plan.json         # without --output: JSON on stdout
+ado testplan export 12 --format html --output plan.html # offline, read-only HTML report
 ado testplan import plan.json --dry-run           # what would change; writes nothing
 ado testplan import plan.json                     # asks before updating several test cases (--yes skips that)
 ```
@@ -408,6 +409,8 @@ ado testplan import plan.json                     # asks before updating several
 `show` is read-only and fetches the plan, suites and their test case IDs, not work-item fields or test steps.
 Suites are shown in a stable hierarchy; test cases assigned to several suites count only once in the overall total.
 Use `export` when you need a portable edit/import document. In `show`, expected results are part of the test case definition; `--with results` instead reads actual outcomes from test runs. An absent run is not a passing test. All modes are read-only.
+
+HTML is a self-contained, read-only report with suite navigation and tables of actions and expected results. Import continues to use JSON only.
 
 ### The file
 

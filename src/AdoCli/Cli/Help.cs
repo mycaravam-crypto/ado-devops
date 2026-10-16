@@ -17,7 +17,7 @@ public static class Help
           pr        list, show, context, diff, checkout, create, approve, merge
           commit    context
           workitem  list, show, create, edit
-          testplan  list, show, export, import, coverage
+          testplan  list, show, export, import, coverage, progress
           build     list, show, run
 
         Inside a cloned Azure DevOps repository, project and repository are detected
@@ -229,11 +229,18 @@ public static class Help
           ado testplan export <id>      write the plan's suites and test cases, with their steps,
                                         as JSON to stdout
               --format json|html        JSON for edit/import (default), HTML for offline viewing
+              --with-results           include point-based progress in HTML (HTML only)
+              --area <path>            optional area filter for HTML progress
               --output <file>           write to this file instead
           ado testplan coverage <id>   requirement and execution coverage for one Area Path
               --area <path>            required; includes subareas
               --format text|json|html   default: text
               --output <file>          write report to file
+          ado testplan progress <id>   point-based progress by suite and run history
+              --area <path>            optional software area, including subareas
+              --days 14|30             run history window (default: 14)
+              --format text|json|html   default: text
+              --output <file>          write output to file
           ado testplan import <file>    update the test cases edited in the file
               --dry-run                 show what would change, change nothing
               --yes, -y                 do not ask before updating several test cases

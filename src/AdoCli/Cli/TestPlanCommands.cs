@@ -168,8 +168,11 @@ public static class TestPlanCommands
     /// <summary>ado testplan export &lt;id&gt; [--output file]: the plan as a <see cref="TestPlanFile"/>, on stdout without --output.</summary>
     public static async Task<int> ExportAsync(Context ctx)
     {
-        var file = await ExportAsync(ctx.Client, ctx.RequireProject(), ctx.Id("testplan export <id> [--output plan.json]"));
-        var json = file.Write();
+        var format = ctx.Args.Get("--format") ?? "json";
+        if (format is not ("json" or "html"))
+            throw AdoException.Usage("--format must be json or html");
+        var file = await ExportAsync(ctx.Client, ctx.RequireProject(), ctx.Id("testplan export <id> [--format json|html] [--output file]"));
+        var json = format == "html" ? TestPlanHtml.Render(file) : file.Write();
         if (ctx.Args.Get("--output") is { } path)
         {
             File.WriteAllText(path, json);

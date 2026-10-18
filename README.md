@@ -24,6 +24,7 @@ dotnet publish src/AdoCli -c Release -r win-x64 --self-contained false -p:Publis
 ```
 
 `--self-contained true` gives a larger binary that runs without .NET installed. To update, pull and publish again.
+Step by step for bash and PowerShell: [docs/install.md](docs/install.md).
 
 Then log in with a personal access token (scopes: Code read & write, Work items read & write, Build read & execute,
 Test management read):
@@ -65,6 +66,10 @@ ado testplan export 12 --output plan.json && ado testplan import plan.json --dry
 ado pr context 142 | jq '.workItems'
 ```
 
+Details and examples: [pull requests and commits](docs/pull-requests.md), [work items](docs/work-items.md) (filters,
+bulk edits, requirement context, search), [test plans](docs/test-plans.md) (the JSON file, import rules, coverage,
+progress).
+
 Global flags: `--json` (data on stdout, messages on stderr), `--debug` (HTTP log, never credentials), `--insecure`,
 `--ca-cert`, `--proxy`. Test plan commands always use REST API 5.0, which Azure DevOps Server 2020 needs for them.
 
@@ -84,7 +89,7 @@ Each setting comes from the first of: flag, environment variable, `~/.ado/config
 
 For an internal CA, prefer `ado config set caCert company-ca.pem` over `insecure`, which skips certificate checks.
 TLS and proxy settings are passed on to git for `repo clone`, `pr checkout` and `pr diff`. TFS 2018 and older are not
-supported.
+supported. More on settings, TLS, proxy, shell defaults and scripting: [docs/configuration.md](docs/configuration.md).
 
 ## Exit codes
 
@@ -108,6 +113,6 @@ dotnet run --project src/AdoCli -- --help
 
 No dependencies beyond .NET (tests use xUnit and a stub HTTP handler, no server needed). Commands live in
 `src/AdoCli/Cli/`, the REST client in `src/AdoCli/Api/`, git in `src/AdoCli/Git/`; [docwizz.yaml](docwizz.yaml)
-enforces that layering on every PR. Every merge to `main` is released as the next SemVer tag; a PR label picks the
+enforces that layering on every PR. Code layout and versioning: [docs/development.md](docs/development.md). Every merge to `main` is released as the next SemVer tag; a PR label picks the
 bump: `release:patch` (default), `release:minor`, `release:major` or `release:none`. Scope and non-goals:
 [PLAN.md](PLAN.md).

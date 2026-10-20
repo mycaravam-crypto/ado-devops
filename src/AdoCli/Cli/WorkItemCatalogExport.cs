@@ -7,6 +7,10 @@ using AdoCli.Api;
 public static class WorkItemCatalogExport
 {
     public const string Schema = "ado.workitem-catalog/v1";
+    const string AnyState = "any";
+    const int MaxWiqlRows = 20000;
+    const string AreaField = "System.AreaPath";
+    const string IterationField = "System.IterationPath";
 
     public sealed record Item(int Id, string Type, string Title, string State, string Area, string Iteration,
         int? Revision, string? ChangedDate, string? WebUrl,
@@ -25,11 +29,11 @@ public static class WorkItemCatalogExport
         var project = ctx.RequireProject();
         var ids = await ctx.Client.QueryWorkItemIdsAsync(project, new WorkItemFilter
         {
-            Everyone = true, States = ["any"], Area = area
+            Everyone = true, States = [AnyState], Area = area
         });
         var warnings = new List<string>();
         // Azure DevOps WIQL returns at most 20,000 rows; a full-cap result cannot prove completeness.
-        if (ids.Count >= 20000)
+        if (ids.Count >= MaxWiqlRows)
             warnings.Add("WIQL returned 20000 IDs: the selection may be truncated");
         var output = new List<Item>();
         var description = ctx.Args.Get("--description-field") is { Length: > 0 } d ? new[] { d } : WorkItemCommands.DescriptionFields;
@@ -45,7 +49,7 @@ public static class WorkItemCatalogExport
                 var edges = (detail.Relations.Items ?? []).Select(r => new Edge(r.Kind, r.Id))
                     .Distinct().OrderBy(r => r.Kind, StringComparer.Ordinal).ThenBy(r => r.Id).ToArray();
                 output.Add(new Item(id, detail.Type, detail.Title, detail.State,
-                    item.Field("System.AreaPath"), item.Field("System.IterationPath"),
+                    item.Field(AreaField), item.Field(IterationField),
                     detail.Revision, detail.ChangedDate, detail.WebUrl, detail.Description.Text,
                     detail.AcceptanceCriteria.Text, detail.AcceptanceCriteria.Items.Select(c => c.Text).ToArray(), edges));
             }
@@ -54,8 +58,8 @@ public static class WorkItemCatalogExport
                 warnings.Add($"work item {id} unavailable: {e.Message}");
             }
         }
-        var snapshot = new Snapshot(Schema, project, area, ctx.Client.Server,
-            warnings.Count == 0 && output.Count == ids.Distinct().Count(), warnings, output);
+        var complete = warnings.Count == 0 && output.Count == ids.Distinct().Count();
+        var snapshot = new Snapshot(Schema, project, area, ctx.Client.Server, complete, warnings, output);
         var json = JsonSerializer.Serialize(snapshot, Json.Options) + "\n";
         var path = ctx.Args.Get("--output");
         if (path is null) Console.Write(json);

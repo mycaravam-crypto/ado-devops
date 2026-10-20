@@ -159,6 +159,10 @@ public static class Help
 
         Usage:
           ado workitem list             list work items assigned to you, open ones by default
+          ado workitem export --area <path> [--output <file>]
+                                        versioned area-scoped inventory (read-only); all users and states
+              --description-field <ref> custom description field
+              --criteria-field <ref>    custom acceptance criteria field
               --summary                 count and breakdown by type, state and priority
           ado workitem show <id>        show a work item with every field
           ado workitem context <id>     requirement context as JSON (schema ado.requirement-context/v1):

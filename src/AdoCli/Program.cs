@@ -82,6 +82,7 @@ public static class Program
             ("pr", "merge") => PrCommands.MergeAsync(ctx),
             ("commit", "context") => CommitCommands.ContextAsync(ctx),
             ("workitem", "list") => WorkItemCommands.ListAsync(ctx),
+            ("workitem", "export") => WorkItemCatalogExport.RunAsync(ctx),
             ("workitem", "show") => WorkItemCommands.ShowAsync(ctx),
             ("workitem", "context") => WorkItemCommands.ContextAsync(ctx),
             ("workitem", "search") => WorkItemCommands.SearchAsync(ctx),

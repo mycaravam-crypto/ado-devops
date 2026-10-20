@@ -49,7 +49,7 @@ public static class WorkItemCatalogExport
                     detail.Revision, detail.ChangedDate, detail.WebUrl, detail.Description.Text,
                     detail.AcceptanceCriteria.Text, detail.AcceptanceCriteria.Items.Select(c => c.Text).ToArray(), edges));
             }
-            catch (AdoException e) when (e.ExitCode is AdoException.NotFound or AdoException.Forbidden)
+            catch (AdoException e) when (e.ExitCode is AdoException.NotFound or AdoException.Permission)
             {
                 warnings.Add($"work item {id} unavailable: {e.Message}");
             }

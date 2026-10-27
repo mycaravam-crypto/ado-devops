@@ -2,6 +2,10 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>ado</ToolCommandName>
+    <PackageId>AdoCli</PackageId>
+    <Description>Azure DevOps command-line client.</Description>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>

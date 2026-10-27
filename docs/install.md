@@ -2,6 +2,22 @@
 
 Building needs the [.NET 10 SDK](https://dotnet.microsoft.com/download). Running needs `git` on your `PATH`.
 
+## Install as a global .NET tool (recommended)
+
+From the cloned repository root, with .NET 10 SDK installed:
+
+```bash
+dotnet pack src/AdoCli -c Release -o artifacts
+dotnet tool install --global AdoCli --add-source ./artifacts
+ado --version
+```
+
+For an existing installation, use `dotnet tool update --global AdoCli --add-source ./artifacts`.
+If an installed version is newer than the locally built version, uninstall it first or pack a higher version.
+Make sure `$HOME/.dotnet/tools` is on your `PATH` (restart your shell if necessary).
+
+The existing publish instructions below remain available for standalone binaries.
+
 ## 1. Compile
 
 `dotnet publish` creates a single `ado` executable (`ado.exe` on Windows). Choose the runtime identifier for your platform:

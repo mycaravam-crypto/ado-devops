@@ -75,4 +75,32 @@ public sealed class DevelopmentMetricsTests
         Assert.Contains("data-metric=\"duration\"", html);
     }
 
+    [Fact]
+    public void OlderActivePullRequestsRemainCandidates()
+    {
+        var cutoff = new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero);
+        var old = cutoff.AddMonths(-2);
+        Assert.True(DevelopmentMetrics.IsCandidate(Pr(1, old, null), cutoff));
+        Assert.False(DevelopmentMetrics.IsCandidate(
+            Pr(2, old, cutoff.AddDays(-1)), cutoff));
+        Assert.True(DevelopmentMetrics.IsCandidate(
+            Pr(3, old, cutoff.AddDays(1)), cutoff));
+    }
+
+    [Fact]
+    public void MedianHandlesOddEvenAndMissingDates()
+    {
+        var start = new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero);
+        Assert.Equal(2, DevelopmentMetrics.MedianDays([
+            Pr(1, start, start.AddDays(1)),
+            Pr(2, start, start.AddDays(2)),
+            Pr(3, start, start.AddDays(9))
+        ]));
+        Assert.Equal(3, DevelopmentMetrics.MedianDays([
+            Pr(1, start, start.AddDays(2)),
+            Pr(2, start, start.AddDays(4))
+        ]));
+        Assert.Null(DevelopmentMetrics.MedianDays([Pr(3, start, null)]));
+    }
+
 }

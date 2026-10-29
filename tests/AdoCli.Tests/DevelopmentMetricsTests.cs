@@ -159,4 +159,19 @@ public sealed class DevelopmentMetricsTests
                     html.IndexOf("class=\"kpis\"", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void TopTrendOffersSvgSafeTogglesAndAllMonthNames()
+    {
+        var report = DevelopmentMetrics.Aggregate("Project", "Area", 3,
+            new DateTimeOffset(2026, 3, 15, 0, 0, 0, TimeSpan.Zero), [], 0);
+        var html = DevelopmentMetrics.TopLineChart(report);
+        Assert.Contains("Jan 2026", html);
+        Assert.Contains(">Feb</text>", html);
+        Assert.Contains(">Mar</text>", html);
+        Assert.Contains("group.removeAttribute(\"hidden\")", html);
+        Assert.Contains("group.setAttribute(\"hidden\", \"\")", html);
+        Assert.DoesNotContain("group.hidden =", html);
+        Assert.Contains("data-series=\"closed\"", html);
+    }
+
 }

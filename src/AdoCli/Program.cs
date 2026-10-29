@@ -113,7 +113,7 @@ public static class Program
         var command = a.At(0) == "help" ? a.At(1) : a.At(0);
         if (a.Has("--help") || a.Has("-h") || a.At(0) == "help" || a.Positional.Count == 0)
             return Help.For(command) ?? Help.Overview;
-        return a.Positional.Count == 1 ? Help.For(command) : null;
+        return a.Positional.Count == 1 && command != "metrics" ? Help.For(command) : null;
     }
 
     static Task<int> Print(string text)

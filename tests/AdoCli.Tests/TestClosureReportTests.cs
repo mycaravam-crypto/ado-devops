@@ -14,7 +14,7 @@ public sealed class TestClosureReportTests
         var closure = TestClosureReport.FromProgress("Project", progress, timestamp);
         Assert.Equal("ado.test-closure/v1", closure.Format);
         Assert.Equal(3, closure.Executed);
-        Assert.Equal(3, closure.Open);
+        Assert.Equal(3, closure.Outstanding);
         Assert.Equal(60, closure.ExecutionPercent);
         Assert.Equal(66.7, closure.PassPercent);
         Assert.Equal(timestamp, closure.GeneratedAt);

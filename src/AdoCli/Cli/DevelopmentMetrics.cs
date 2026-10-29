@@ -70,7 +70,9 @@ public static class DevelopmentMetrics
         // Include older PRs closed during the selected period as well.
         var candidates = all.Where(p =>
             (p.CreationDate is { } created && created >= cutoff) ||
-            (p.ClosedDate is { } closed && closed >= cutoff)).ToList();
+            (p.ClosedDate is { } closed && closed >= cutoff) ||
+            (p.ClosedDate is null && p.CreationDate is { } activeCreated && activeCreated < cutoff &&
+                p.Status.Equals("active", StringComparison.OrdinalIgnoreCase))).ToList();
         var matched = new List<PullRequest>();
         var unlinked = 0;
         foreach (var pr in candidates)

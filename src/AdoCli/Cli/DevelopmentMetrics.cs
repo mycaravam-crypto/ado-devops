@@ -67,7 +67,7 @@ public static class DevelopmentMetrics
         (pr.ClosedDate is null && pr.CreationDate is { } older && older < cutoff &&
             pr.Status.Equals("active", StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>Only explicitly linked work items with a matching Area Path qualify a PR.</summary>
+    /// <summary>Only explicitly linked work items with a matching Area Path qualify a PR; optional callback receives processed, total, matched and unlinked counts.</summary>
     public static async Task<(List<PullRequest> Matched, int Unlinked)> CollectAsync(
         AdoClient client, string project, string area, int months, Action<int, int, int, int>? progress = null)
     {
@@ -228,15 +228,18 @@ public static class DevelopmentMetrics
     }
 
     /// <summary>Write bounded progress updates to stderr, leaving stdout machine-readable.</summary>
+    private const int ProgressBarWidth = 20;
+    private const int ProgressUpdateIntervalPercent = 5;
+
     public static Action<int, int, int, int> Progress(TextWriter writer, bool interactive)
     {
         var lastPercent = -1;
         return (done, total, matched, unlinked) =>
         {
             var percent = total == 0 ? 100 : done * 100 / total;
-            if (done != total && percent / 5 == lastPercent / 5) return;
+            if (done != total && percent / ProgressUpdateIntervalPercent == lastPercent / ProgressUpdateIntervalPercent) return;
             lastPercent = percent;
-            var width = 20;
+            var width = ProgressBarWidth;
             var filled = percent * width / 100;
             var line = $"[{new string('#', filled)}{new string('-', width - filled)}] {percent,3}% ({done}/{total}) matched: {matched}, unlinked: {unlinked}";
             if (interactive)
@@ -284,10 +287,11 @@ public static class DevelopmentMetrics
         else
         {
             Console.Error.WriteLine($"Fetching project pull requests and matching linked work items in {area}...");
-            (matched, unlinked) = await CollectAsync(ctx.Client, project, area!, months,
+            var selectedArea = area ?? throw AdoException.Usage("--area is required for area scope");
+            (matched, unlinked) = await CollectAsync(ctx.Client, project, selectedArea, months,
                 Progress(Console.Error, !Console.IsErrorRedirected));
             if (matched.Count == 0)
-                Console.Error.WriteLine("Warning: " + NoMatchesMessage(area, unlinked));
+                Console.Error.WriteLine("Warning: " + NoMatchesMessage(selectedArea, unlinked));
         }
         Console.Error.WriteLine($"Matched {matched.Count} pull requests; unlinked candidates: {unlinked}. Calculating KPIs...");
         var report = Aggregate(project, displayedArea, months, DateTimeOffset.UtcNow, matched, unlinked);

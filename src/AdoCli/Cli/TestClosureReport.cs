@@ -1,6 +1,7 @@
 namespace AdoCli.Cli;
 
 using System.Net;
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using AdoCli.Api;
@@ -67,12 +68,34 @@ public static class TestClosureReport
         return file with { Suites = suites, TestCases = cases };
     }
 
+    /// <summary>Empty signature lines for handwritten sign-off; not a digital signature.</summary>
+    public static string SignatureHtml() => """
+        <section id="signatures" class="closure-signatures">
+          <h2>Sign-off / Unterschriften</h2>
+          <p class="muted">Signatures document review, not automatic approval of test results.</p>
+          <div class="signature-grid">
+            <div><h3>Kunde / Customer</h3><div class="signature-line"></div><p>Name / Funktion</p><div class="signature-line"></div><p>Ort, Datum / Unterschrift</p></div>
+            <div><h3>Lieferant / Supplier</h3><div class="signature-line"></div><p>Name / Funktion</p><div class="signature-line"></div><p>Ort, Datum / Unterschrift</p></div>
+          </div>
+        </section>
+        <style>
+          .signature-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin:24px 0}
+          .signature-grid>div{break-inside:avoid}
+          .signature-line{height:52px;border-bottom:1px solid var(--ink)}
+          .closure-signatures{break-inside:avoid}
+          @media(max-width:650px){.signature-grid{grid-template-columns:1fr}}
+          @media print{.closure-signatures{break-before:page}}
+        </style>
+        """;
+
     public static async Task<int> RunAsync(Context ctx)
     {
-        var id = ctx.Id("testplan report <id> [--area path] [--format html|json] [--output file]");
+        var id = ctx.Id("testplan report <id> [--area path] [--format html|json|pdf] [--output file]");
         var format = ctx.Args.Get("--format") ?? (ctx.Json ? "json" : "html");
-        if (format is not ("html" or "json"))
-            throw AdoException.Usage("--format must be html or json");
+        if (format is not ("html" or "json" or "pdf"))
+            throw AdoException.Usage("--format must be html, json or pdf");
+        if (format == "pdf" && string.IsNullOrWhiteSpace(ctx.Args.Get("--output")))
+            throw AdoException.Usage("--output is required for PDF export");
         var project = ctx.RequireProject();
         var progress = await TestPlanProgress.BuildAsync(ctx.Client, project, id, ctx.Args.Get("--area"));
         var report = FromProgress(project, progress, DateTimeOffset.UtcNow);
@@ -88,7 +111,13 @@ public static class TestClosureReport
             var (shared, errors) = await TestPlanCommands.ResolveSharedStepsAsync(ctx.Client, file);
             var scoped = FilterByArea(file, report.Area);
             output = TestPlanHtml.Render(scoped, shared, errors, progress, excludeParameters: true,
-                reportTitle: "Test closure report", introductionHtml: SummaryHtml(report));
+                reportTitle: "Test closure report", introductionHtml: SummaryHtml(report) + SignatureHtml());
+        }
+        if (format == "pdf")
+        {
+            await TestClosurePdf.WriteAsync(output, ctx.Args.Get("--output")!);
+            Console.Error.WriteLine($"Wrote test closure PDF to {ctx.Args.Get("--output")}");
+            return 0;
         }
         if (ctx.Args.Get("--output") is { } path)
         {

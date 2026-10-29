@@ -54,4 +54,13 @@ public sealed class TestClosureReportTests
         Assert.Contains("<title>Test closure report</title>", html);
         Assert.Equal(1, html.Split("id=\"closure\"").Length - 1);
     }
+    [Fact]
+    public void SignatureFieldsAppearForBothPartiesWithoutPretendingToBeSigned()
+    {
+        var html = TestClosureReport.SignatureHtml();
+        Assert.Contains("Kunde / Customer", html);
+        Assert.Contains("Lieferant / Supplier", html);
+        Assert.Contains("signature-line", html);
+        Assert.Contains("not automatic approval", html);
+    }
 }

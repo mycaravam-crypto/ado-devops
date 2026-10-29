@@ -33,4 +33,25 @@ public sealed class TestClosureReportTests
         Assert.Contains("not a release approval", html);
         Assert.Contains("Test points", html);
     }
+
+    [Fact]
+    public void AreaScopedHtmlExcludesUnrelatedCases()
+    {
+        var file = new TestPlanFile(TestPlanFile.CurrentFormat, "Project",
+            new PlanInfo(12, "Release", "Active", null, 10),
+            [new SuiteInfo(10, "Mixed suite", "StaticTestSuite", null, [1, 2])],
+            [
+                new TestCaseEntry(1, 1, "Alpha only",
+                    new Dictionary<string, string> { ["System.AreaPath"] = "Product\\\\ALPHA\\\\Web" }, []),
+                new TestCaseEntry(2, 1, "Beta only",
+                    new Dictionary<string, string> { ["System.AreaPath"] = "Product\\\\BETA" }, [])
+            ]);
+        var scoped = TestClosureReport.FilterByArea(file, "Product\\\\ALPHA");
+        var html = TestPlanHtml.Render(scoped, reportTitle: "Test closure report",
+            introductionHtml: "<section id=\\\"closure\\\">Summary</section>");
+        Assert.Contains("Alpha only", html);
+        Assert.DoesNotContain("Beta only", html);
+        Assert.Contains("<title>Test closure report</title>", html);
+        Assert.Equal(1, html.Split("id=\\\"closure\\\"").Length - 1);
+    }
 }

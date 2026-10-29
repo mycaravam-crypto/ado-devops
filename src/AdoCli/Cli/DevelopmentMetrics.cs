@@ -222,11 +222,16 @@ public static class DevelopmentMetrics
             }
             sb.Append("</g>");
         }
-        if (report.Timeline.Count > 0)
+        var labelSpan = Math.Max(1, report.Timeline.Count - 1);
+        for (var i = 0; i < report.Timeline.Count; i++)
         {
-            sb.Append("<text x=\"40\" y=\"200\" font-size=\"12\" fill=\"currentColor\">")
-                .Append(report.Timeline[0].Period).Append("</text><text x=\"720\" y=\"200\" font-size=\"12\" fill=\"currentColor\" text-anchor=\"end\">")
-                .Append(report.Timeline[^1].Period).Append("</text>");
+            var month = report.Timeline[i];
+            var date = DateTime.ParseExact(month.Period, "yyyy-MM", CultureInfo.InvariantCulture);
+            var label = date.ToString("MMM", CultureInfo.GetCultureInfo("en-US"));
+            if (date.Month == 1 || i == 0) label += " " + date.Year.ToString(CultureInfo.InvariantCulture);
+            var x = (40 + i * 680.0 / labelSpan).ToString("0.##", CultureInfo.InvariantCulture);
+            sb.Append("<text x=\"").Append(x).Append("\" y=\"200\" font-size=\"11\" text-anchor=\"middle\" fill=\"currentColor\">")
+                .Append(label).Append("</text>");
         }
         sb.Append("""
             </svg><p class="muted">Monthly UTC trend · select a metric to compare months. Exact values are listed below.</p>
@@ -250,7 +255,10 @@ public static class DevelopmentMetrics
               buttons.forEach(button => button.addEventListener('click', () => {
                 const selected = button.dataset.series;
                 buttons.forEach(item => item.setAttribute('aria-pressed', String(item === button)));
-                groups.forEach(group => group.hidden = group.dataset.series !== selected);
+                groups.forEach(group => {
+                  if (group.dataset.series === selected) group.removeAttribute("hidden");
+                  else group.setAttribute("hidden", "");
+                });
               }));
             })();
             </script>

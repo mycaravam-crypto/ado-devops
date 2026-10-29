@@ -82,4 +82,41 @@ public sealed class TestClosureReportTests
         Assert.True(signatures < html.IndexOf("</main>", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData("Passed", "Passed")]
+    [InlineData("Failed", "Failed")]
+    [InlineData("Blocked", "Blocked")]
+    [InlineData("NotExecuted", "NotRun")]
+    public void CaseOutcomeForSinglePoint(string source, string expected) =>
+        Assert.Equal(expected, TestClosureReport.CaseOutcome([source]));
+
+    [Fact]
+    public void MultipleConfigurationsDoNotHideFailuresOrUnexecutedTests()
+    {
+        Assert.Equal("Failed", TestClosureReport.CaseOutcome(["Passed", "Failed"]));
+        Assert.Equal("NotRun", TestClosureReport.CaseOutcome(["Passed", "NotExecuted"]));
+        Assert.Equal("Blocked", TestClosureReport.CaseOutcome(["Passed", "Blocked"]));
+        Assert.Equal("NotRun", TestClosureReport.CaseOutcome([]));
+        Assert.Equal("Passed", TestClosureReport.CaseOutcome(["Passed", "Passed"]));
+    }
+
+    [Theory]
+    [InlineData("Passed", "Passed", "#168567")]
+    [InlineData("Failed", "Failed", "#c0392b")]
+    [InlineData("Blocked", "Blocked", "#bf8616")]
+    [InlineData("NotRun", "Not run", "#667587")]
+    public void TestCaseTrafficLightAppearsNextToCaseName(string outcome, string label, string color)
+    {
+        var file = new TestPlanFile(TestPlanFile.CurrentFormat, "Project",
+            new PlanInfo(12, "Release", "Active", null, 10),
+            [new SuiteInfo(10, "Suite", "StaticTestSuite", null, [1])],
+            [new TestCaseEntry(1, 1, "Login case", null, [])]);
+        var map = new Dictionary<(int SuiteId, int CaseId), string> { [(10, 1)] = outcome };
+        var html = TestPlanHtml.Render(file, caseOutcomes: map);
+        Assert.Contains("Login case</h3>", html);
+        Assert.Contains(">" + label + "</span>", html);
+        Assert.Contains("background:" + color, html);
+        Assert.Contains("aria-hidden", html);
+    }
+
 }

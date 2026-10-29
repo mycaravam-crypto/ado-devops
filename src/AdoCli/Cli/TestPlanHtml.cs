@@ -13,9 +13,13 @@ public static class TestPlanHtml
         WebUtility.HtmlDecode(Regex.Replace(value ?? "", "<[^>]*>", " ")),
         @"\s+", " ").Trim();
     static string Label(string? value) => E(Plain(value));
+    private const string PassedColor = "#168567";
+    private const string FailedColor = "#c0392b";
+    private const string BlockedColor = "#bf8616";
+    private const string NotRunColor = "#667587";
 
-    /// <summary>Renders the complete offline test plan report, optionally including resolved Shared Steps and test progress.</summary>
-    public static string Render(TestPlanFile file, IReadOnlyDictionary<int, IReadOnlyList<TestStep>>? sharedSteps = null, IReadOnlyDictionary<int, string>? sharedErrors = null, TestPlanProgress.Report? progress = null, bool excludeParameters = false, string? reportTitle = null, string? introductionHtml = null, string? closingHtml = null)
+    /// <summary>Renders standalone HTML with optional Shared Steps, progress, report sections and per-case execution badges.</summary>
+    public static string Render(TestPlanFile file, IReadOnlyDictionary<int, IReadOnlyList<TestStep>>? sharedSteps = null, IReadOnlyDictionary<int, string>? sharedErrors = null, TestPlanProgress.Report? progress = null, bool excludeParameters = false, string? reportTitle = null, string? introductionHtml = null, string? closingHtml = null, IReadOnlyDictionary<(int SuiteId, int CaseId), string>? caseOutcomes = null)
     {
         var plan = file.Plan ?? throw new ArgumentException("Missing plan.");
         var generatedAt = DateTimeOffset.UtcNow;
@@ -110,7 +114,22 @@ public static class TestPlanHtml
                     sb.Append("<p class=\"empty\">Test case #").Append(id).AppendLine(" not available</p>");
                     continue;
                 }
-                sb.Append("<article class=\"case\"><h3>").Append(E(c.Title)).Append("</h3><small>Test case #")
+                sb.Append("<article class=\"case\"><h3>").Append(E(c.Title)).Append("</h3>");
+                if (caseOutcomes is not null)
+                {
+                    var outcome = caseOutcomes.GetValueOrDefault((suite.Id, id), "NotRun");
+                    var (color, label) = outcome switch
+                    {
+                        "Passed" => (PassedColor, "Passed"),
+                        "Failed" => (FailedColor, "Failed"),
+                        "Blocked" => (BlockedColor, "Blocked"),
+                        _ => (NotRunColor, "Not run")
+                    };
+                    sb.Append(" <span class=\"badge\" style=\"display:inline-flex;align-items:center;gap:6px\">")
+                        .Append("<span aria-hidden=\"true\" style=\"width:10px;height:10px;border-radius:50%;background:")
+                        .Append(color).Append("\"></span>").Append(label).Append("</span>");
+                }
+                sb.Append("<small>Test case #")
                     .Append(c.Id).Append(" · Revision ").Append(c.Rev).Append("</small>");
                 if (c.Fields?.GetValueOrDefault("System.State") is { Length: > 0 } state)
                     sb.Append(" <span class=\"badge\">").Append(E(state)).Append("</span>");

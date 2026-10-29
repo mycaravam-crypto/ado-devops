@@ -15,7 +15,7 @@ public static class TestPlanHtml
     static string Label(string? value) => E(Plain(value));
 
     /// <summary>Renders the complete offline test plan report, optionally including resolved Shared Steps and test progress.</summary>
-    public static string Render(TestPlanFile file, IReadOnlyDictionary<int, IReadOnlyList<TestStep>>? sharedSteps = null, IReadOnlyDictionary<int, string>? sharedErrors = null, TestPlanProgress.Report? progress = null, bool excludeParameters = false, string? reportTitle = null, string? introductionHtml = null)
+    public static string Render(TestPlanFile file, IReadOnlyDictionary<int, IReadOnlyList<TestStep>>? sharedSteps = null, IReadOnlyDictionary<int, string>? sharedErrors = null, TestPlanProgress.Report? progress = null, bool excludeParameters = false, string? reportTitle = null, string? introductionHtml = null, string? closingHtml = null)
     {
         var plan = file.Plan ?? throw new ArgumentException("Missing plan.");
         var generatedAt = DateTimeOffset.UtcNow;
@@ -82,13 +82,13 @@ public static class TestPlanHtml
         foreach (var suite in suites.Where(s => s.ParentId is null || suites.All(p => p.Id != s.ParentId))) Nav(suite);
         foreach (var suite in suites) Nav(suite);
         sb.Append("</ul></nav><main>");
-        if (introductionHtml is not null) sb.Append(introductionHtml);
         sb.Append("<div class=\"eyebrow\">Test plan #").Append(plan.Id)
             .Append("</div><h1>").Append(E(plan.Name)).Append("</h1><p class=\"muted\">")
             .Append(E(file.Project)).Append("</p><div class=\"meta\"><span>Status: ")
             .Append(E(plan.State)).Append("</span><span>Iteration: ").Append(E(plan.Iteration))
             .Append("</span><span>").Append(suites.Count).Append(" suites</span><span>")
             .Append(cases.Count).AppendLine(" unique test cases</span></div>");
+        if (introductionHtml is not null) sb.Append(introductionHtml);
         if (progress is not null) sb.Append(TestPlanProgress.Html(progress));
         sb.Append("<p class=\"muted\">Generated (UTC): ").Append(generatedAt.ToString("yyyy-MM-dd HH:mm:ss"))
             .Append(" · Source: Azure DevOps test plan/work items");
@@ -184,6 +184,7 @@ public static class TestPlanHtml
         displayed.Clear();
         foreach (var s in suites.Where(s => s.ParentId is null || suites.All(p => p.Id != s.ParentId))) Section(s, 0);
         foreach (var s in suites) Section(s, 0);
+        if (closingHtml is not null) sb.Append(closingHtml);
         sb.AppendLine("""
             </main></div>
             <script>

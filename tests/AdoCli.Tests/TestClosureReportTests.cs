@@ -48,10 +48,10 @@ public sealed class TestClosureReportTests
             ]);
         var scoped = TestClosureReport.FilterByArea(file, "Product\\ALPHA");
         var html = TestPlanHtml.Render(scoped, reportTitle: "Test closure report",
-            introductionHtml: "<section id=\\\"closure\\\">Summary</section>");
+            introductionHtml: "<section id=\"closure\">Summary</section>");
         Assert.Contains("Alpha only", html);
         Assert.DoesNotContain("Beta only", html);
         Assert.Contains("<title>Test closure report</title>", html);
-        Assert.Equal(1, html.Split("id=\\\"closure\\\"").Length - 1);
+        Assert.Equal(1, html.Split("id=\"closure\"").Length - 1);
     }
 }

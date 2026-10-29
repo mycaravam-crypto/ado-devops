@@ -95,7 +95,7 @@ public static class TestPlanHtml
             .Append("</span><span>").Append(suites.Count).Append(" suites</span><span>")
             .Append(cases.Count).AppendLine(" unique test cases</span></div>");
         if (introductionHtml is not null) sb.Append(introductionHtml);
-        if (progress is not null) sb.Append(TestPlanProgress.Html(progress));
+        if (progress is not null) sb.Append(TestPlanProgress.Html(progress, includeSummary: introductionHtml is null));
         sb.Append("<p class=\"muted\">Generated (UTC): ").Append(generatedAt.ToString("yyyy-MM-dd HH:mm:ss"))
             .Append(" · Source: Azure DevOps test plan/work items");
         if (progress is not null) sb.Append(" · Progress area: ").Append(E(progress.Area ?? "all"));

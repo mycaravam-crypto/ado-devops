@@ -55,4 +55,24 @@ public sealed class DevelopmentMetricsTests
         Assert.DoesNotContain("<script>", html);
         Assert.Contains("Monthly pull requests", html);
     }
+    [Fact]
+    public void LifecycleMetricsDistinguishCompletedAbandonedAndOpen()
+    {
+        var now = new DateTimeOffset(2026, 10, 29, 0, 0, 0, TimeSpan.Zero);
+        var start = now.AddDays(-12);
+        var merged = Pr(1, start, start.AddDays(2));
+        var abandoned = Pr(2, start, start.AddDays(6)) with { Status = "abandoned" };
+        var open = Pr(3, start, null);
+        var result = DevelopmentMetrics.Aggregate("Project", "Area", 1, now,
+            [merged, abandoned, open], 0);
+        Assert.Equal(1, result.Merged);
+        Assert.Equal(1, result.Abandoned);
+        Assert.Equal(1, result.OpenAtEnd);
+        Assert.Equal(4, result.MedianDays);
+        var html = DevelopmentMetrics.Html(result);
+        Assert.Contains("Interactive monthly trend", html);
+        Assert.Contains("data-metric=\"opened\"", html);
+        Assert.Contains("data-metric=\"duration\"", html);
+    }
+
 }

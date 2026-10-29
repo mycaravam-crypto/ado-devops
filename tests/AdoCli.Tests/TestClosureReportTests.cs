@@ -63,4 +63,23 @@ public sealed class TestClosureReportTests
         Assert.Contains("signature-line", html);
         Assert.Contains("not automatic approval", html);
     }
+    [Fact]
+    public void SummaryFollowsHeadingAndSignaturesFollowSuites()
+    {
+        var file = new TestPlanFile(TestPlanFile.CurrentFormat, "Project",
+            new PlanInfo(12, "Release", "Active", null, 10),
+            [new SuiteInfo(10, "Last suite", "StaticTestSuite", null, [1])],
+            [new TestCaseEntry(1, 1, "Last case", null, [])]);
+        var html = TestPlanHtml.Render(file, reportTitle: "Test closure report",
+            introductionHtml: "<section id=\"closure\">Summary</section>",
+            closingHtml: TestClosureReport.SignatureHtml());
+        var heading = html.IndexOf("<h1>Release</h1>", StringComparison.Ordinal);
+        var summary = html.IndexOf("id=\"closure\"", StringComparison.Ordinal);
+        var suite = html.IndexOf("Last case", StringComparison.Ordinal);
+        var signatures = html.IndexOf("id=\"signatures\"", StringComparison.Ordinal);
+        Assert.True(heading >= 0 && heading < summary);
+        Assert.True(summary < suite && suite < signatures);
+        Assert.True(signatures < html.IndexOf("</main>", StringComparison.Ordinal));
+    }
+
 }

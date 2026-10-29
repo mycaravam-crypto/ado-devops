@@ -111,7 +111,8 @@ public static class TestClosureReport
             var (shared, errors) = await TestPlanCommands.ResolveSharedStepsAsync(ctx.Client, file);
             var scoped = FilterByArea(file, report.Area);
             output = TestPlanHtml.Render(scoped, shared, errors, progress, excludeParameters: true,
-                reportTitle: "Test closure report", introductionHtml: SummaryHtml(report) + SignatureHtml());
+                reportTitle: "Test closure report", introductionHtml: SummaryHtml(report),
+                closingHtml: SignatureHtml());
         }
         if (format == "pdf")
         {

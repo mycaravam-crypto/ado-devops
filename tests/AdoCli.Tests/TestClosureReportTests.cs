@@ -114,8 +114,10 @@ public sealed class TestClosureReportTests
         var map = new Dictionary<(int SuiteId, int CaseId), string> { [(10, 1)] = outcome };
         var html = TestPlanHtml.Render(file, caseOutcomes: map);
         Assert.Contains("Login case</h3>", html);
-        Assert.Contains(">" + label + "</span>", html);
-        Assert.Contains("background:" + color, html);
+        Assert.Contains(">" + label + "</div>", html);
+        Assert.Contains("--status-color:" + color, html);
+        Assert.Contains("class=\"case-status\"", html);
+        Assert.Contains("background:transparent", html);
         Assert.Contains("aria-hidden", html);
     }
 

@@ -224,7 +224,7 @@ public static class DevelopmentMetrics
     public static async Task<int> RunAsync(Context ctx)
     {
         var area = ctx.Args.Get("--area");
-        if (string.IsNullOrWhiteSpace(area))
+        if (string.IsNullOrWhiteSpace(area) && ctx.Args.Get("--scope") != "repository")
             throw AdoException.Usage("--area is required (example: ado metrics --area Product\\ALPHA)");
         var format = ctx.Args.Get("--format") ?? (ctx.Json ? "json" : "html");
         if (format is not ("html" or "json"))

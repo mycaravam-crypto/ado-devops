@@ -113,4 +113,25 @@ public sealed class DevelopmentMetricsTests
         Assert.Contains("not Area Path metrics", message);
     }
 
+    [Fact]
+    public void ProgressWritesBoundedUpdatesToStderrStream()
+    {
+        using var writer = new StringWriter();
+        var update = DevelopmentMetrics.Progress(writer, interactive: false);
+        for (var done = 1; done <= 100; done++)
+            update(done, 100, done / 2, 0);
+        var output = writer.ToString();
+        Assert.Contains("100% (100/100)", output);
+        Assert.Contains("matched: 50", output);
+        Assert.True(output.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length <= 22);
+    }
+
+    [Fact]
+    public void EmptyCandidateSetReportsCompletion()
+    {
+        using var writer = new StringWriter();
+        DevelopmentMetrics.Progress(writer, interactive: false)(0, 0, 0, 0);
+        Assert.Contains("100% (0/0)", writer.ToString());
+    }
+
 }

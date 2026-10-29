@@ -17,7 +17,7 @@ public static class Help
           pr        list, show, context, diff, checkout, create, approve, merge
           commit    context
           workitem  list, show, create, edit
-          testplan  list, show, export, import, coverage, progress, trace-export
+          testplan  list, show, export, import, coverage, progress, report, trace-export
           build     list, show, run
 
         Inside a cloned Azure DevOps repository, project and repository are detected

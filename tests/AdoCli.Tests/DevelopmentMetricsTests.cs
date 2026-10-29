@@ -103,4 +103,14 @@ public sealed class DevelopmentMetricsTests
         Assert.Null(DevelopmentMetrics.MedianDays([Pr(3, start, null)]));
     }
 
+    [Fact]
+    public void NoAreaMatchesExplainsUnlinkedPullRequests()
+    {
+        var message = DevelopmentMetrics.NoMatchesMessage("LogDB-Web", 17);
+        Assert.Contains("17 candidate PR(s)", message);
+        Assert.Contains("no Area Path", message);
+        Assert.Contains("--scope repository", message);
+        Assert.Contains("not Area Path metrics", message);
+    }
+
 }

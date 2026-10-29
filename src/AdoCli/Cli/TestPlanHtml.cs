@@ -59,6 +59,8 @@ public static class TestPlanHtml
             h3{font-size:17px;margin:0 0 10px;color:var(--ink)}h4{color:var(--ink)}.muted{color:var(--muted)}.eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--accent);font-weight:800}
             .meta{display:flex;gap:12px;flex-wrap:wrap;margin:18px 0 28px}.meta span{background:var(--accent-soft);border-radius:6px;padding:5px 10px;font-size:13px}
             .case{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px;margin:16px 0;break-inside:avoid}.case small{color:var(--muted)}
+            .case-status{display:inline-flex;align-items:center;gap:8px;margin:8px 0 12px;padding:0;background:transparent;color:var(--text);font-size:13px;font-weight:650;line-height:1.5;vertical-align:middle}
+            .case-status-dot{display:inline-block;flex:none;width:10px;height:10px;border-radius:50%;background:var(--status-color);box-shadow:0 0 0 2px var(--surface);print-color-adjust:exact;-webkit-print-color-adjust:exact}
             .table-wrap{max-width:100%;overflow-x:auto;margin:18px 0 26px;border:1px solid var(--line);border-radius:10px}table{width:100%;border-spacing:0;border-collapse:separate;font-size:13px}
             th,td{border-bottom:1px solid var(--line);padding:10px 14px;text-align:left;vertical-align:top;overflow-wrap:normal}td{overflow-wrap:anywhere}th{background:var(--surface-soft);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.045em}
             tbody tr:nth-child(even){background:var(--surface-soft)}tbody tr:last-child td{border-bottom:0}.empty{color:var(--muted);font-style:italic}.suite{margin-bottom:30px;scroll-margin-top:90px}.badge{font-size:12px;padding:3px 7px;border-radius:5px;background:var(--accent-soft)}
@@ -125,9 +127,9 @@ public static class TestPlanHtml
                         "Blocked" => (BlockedColor, "Blocked"),
                         _ => (NotRunColor, "Not run")
                     };
-                    sb.Append(" <span class=\"badge\" style=\"display:inline-flex;align-items:center;gap:6px\">")
-                        .Append("<span aria-hidden=\"true\" style=\"width:10px;height:10px;border-radius:50%;background:")
-                        .Append(color).Append("\"></span>").Append(label).Append("</span>");
+                    sb.Append("<div class=\"case-status\" style=\"--status-color:")
+                        .Append(color).Append("\"><span class=\"case-status-dot\" aria-hidden=\"true\"></span>")
+                        .Append(label).Append("</div>");
                 }
                 sb.Append("<small>Test case #")
                     .Append(c.Id).Append(" · Revision ").Append(c.Rev).Append("</small>");

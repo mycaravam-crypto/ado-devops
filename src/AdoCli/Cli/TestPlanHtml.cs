@@ -14,7 +14,7 @@ public static class TestPlanHtml
         @"\s+", " ").Trim();
     static string Label(string? value) => E(Plain(value));
 
-    /// <summary>Renders the complete offline test plan report, optionally including resolved Shared Steps and test progress.</summary>
+    /// <summary>Renders standalone HTML with optional Shared Steps, progress, report sections and per-case execution badges.</summary>
     public static string Render(TestPlanFile file, IReadOnlyDictionary<int, IReadOnlyList<TestStep>>? sharedSteps = null, IReadOnlyDictionary<int, string>? sharedErrors = null, TestPlanProgress.Report? progress = null, bool excludeParameters = false, string? reportTitle = null, string? introductionHtml = null, string? closingHtml = null, IReadOnlyDictionary<(int SuiteId, int CaseId), string>? caseOutcomes = null)
     {
         var plan = file.Plan ?? throw new ArgumentException("Missing plan.");
@@ -116,10 +116,10 @@ public static class TestPlanHtml
                     var outcome = caseOutcomes.GetValueOrDefault((suite.Id, id), "NotRun");
                     var (color, label) = outcome switch
                     {
-                        "Passed" => ("#168567", "Erfolgreich"),
-                        "Failed" => ("#c0392b", "Fehlgeschlagen"),
-                        "Blocked" => ("#bf8616", "Blockiert"),
-                        _ => ("#667587", "Nicht durchgeführt")
+                        "Passed" => ("#168567", "Passed"),
+                        "Failed" => ("#c0392b", "Failed"),
+                        "Blocked" => ("#bf8616", "Blocked"),
+                        _ => ("#667587", "Not run")
                     };
                     sb.Append(" <span class=\"badge\" style=\"display:inline-flex;align-items:center;gap:6px\">")
                         .Append("<span aria-hidden=\"true\" style=\"width:10px;height:10px;border-radius:50%;background:")

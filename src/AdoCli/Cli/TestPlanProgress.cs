@@ -97,22 +97,26 @@ public static class TestPlanProgress
         path.StartsWith(area.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Renders HTML content to embed in a standalone DocWizz-style report.</summary>
-    public static string Html(Report r)
+    public static string Html(Report r, bool includeSummary = true)
     {
         static string E(string? v) => WebUtility.HtmlEncode(v ?? "");
         var sb = new StringBuilder();
-        sb.Append("<section id=\"progress\"><h2>Test progress</h2><p class=\"muted\">Generated (UTC): ")
-            .Append(DateTimeOffset.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"))
-            .Append(" · Source: legacy Test API 5.0 · ");
-        sb.Append("Point-based status (suite × case × configuration); execution history based on test runs. ");
-        sb.Append("Area: ").Append(E(r.Area ?? "all")).Append("</p>");
-        sb.Append("<div class=\"meta\"><span>Test points: ").Append(r.Points)
-            .Append("</span><span>Passed: ").Append(r.Passed).Append("</span><span>Failed: ")
-            .Append(r.Failed).Append("</span><span>Blocked: ").Append(r.Blocked)
-            .Append("</span><span>Not run: ").Append(r.NotRun)
-            .Append("</span><span>Executed: ").Append(r.ExecutionPercent.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))
-            .Append("%</span><span>Pass rate: ").Append(r.PassPercent.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))
-            .Append("%</span></div>");
+        sb.Append("<section id=\"progress\"><h2>Test execution details</h2>");
+        if (includeSummary)
+        {
+                sb.Append("<p class=\"muted\">Generated (UTC): ")
+                .Append(DateTimeOffset.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"))
+                .Append(" · Source: legacy Test API 5.0 · ");
+            sb.Append("Point-based status (suite × case × configuration); execution history based on test runs. ");
+            sb.Append("Area: ").Append(E(r.Area ?? "all")).Append("</p>");
+            sb.Append("<div class=\"meta\"><span>Test points: ").Append(r.Points)
+                .Append("</span><span>Passed: ").Append(r.Passed).Append("</span><span>Failed: ")
+                .Append(r.Failed).Append("</span><span>Blocked: ").Append(r.Blocked)
+                .Append("</span><span>Not run: ").Append(r.NotRun)
+                .Append("</span><span>Executed: ").Append(r.ExecutionPercent.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))
+                .Append("%</span><span>Pass rate: ").Append(r.PassPercent.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))
+                .Append("%</span></div>");
+            }
         sb.Append("<h3>By suite</h3><div class=\"table-wrap\"><table><thead><tr><th>Suite</th><th>Total</th><th>Passed</th><th>Failed</th><th>Blocked</th><th>Not run</th></tr></thead><tbody>");
         foreach (var suite in r.Suites)
             sb.Append("<tr><td>").Append(E(suite.Name)).Append("</td><td>").Append(suite.Total)

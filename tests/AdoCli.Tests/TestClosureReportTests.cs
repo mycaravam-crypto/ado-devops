@@ -42,11 +42,11 @@ public sealed class TestClosureReportTests
             [new SuiteInfo(10, "Mixed suite", "StaticTestSuite", null, [1, 2])],
             [
                 new TestCaseEntry(1, 1, "Alpha only",
-                    new Dictionary<string, string> { ["System.AreaPath"] = "Product\\\\ALPHA\\\\Web" }, []),
+                    new Dictionary<string, string> { ["System.AreaPath"] = "Product\\ALPHA\\Web" }, []),
                 new TestCaseEntry(2, 1, "Beta only",
-                    new Dictionary<string, string> { ["System.AreaPath"] = "Product\\\\BETA" }, [])
+                    new Dictionary<string, string> { ["System.AreaPath"] = "Product\\BETA" }, [])
             ]);
-        var scoped = TestClosureReport.FilterByArea(file, "Product\\\\ALPHA");
+        var scoped = TestClosureReport.FilterByArea(file, "Product\\ALPHA");
         var html = TestPlanHtml.Render(scoped, reportTitle: "Test closure report",
             introductionHtml: "<section id=\\\"closure\\\">Summary</section>");
         Assert.Contains("Alpha only", html);

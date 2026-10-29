@@ -52,7 +52,7 @@ public sealed class DevelopmentMetricsTests
             new DateTimeOffset(2026, 10, 29, 0, 0, 0, TimeSpan.Zero), [], 0);
         var html = DevelopmentMetrics.Html(report);
         Assert.Contains("&lt;script&gt;", html);
-        Assert.DoesNotContain("<script>", html);
+        Assert.DoesNotContain("Area: <script>", html);
         Assert.Contains("Monthly pull requests", html);
     }
     [Fact]

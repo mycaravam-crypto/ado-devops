@@ -18,6 +18,7 @@ public static class Help
           commit    context
           workitem  list, show, create, edit
           testplan  list, show, export, import, coverage, progress, report, trace-export
+          metrics   monthly PR throughput and duration dashboard by Area Path
           build     list, show, run
 
         Inside a cloned Azure DevOps repository, project and repository are detected

@@ -32,6 +32,7 @@ public class ProgramTests
     [InlineData("ado workitem - work items", "workitem", "edit", "-h")]
     [InlineData("ado workitem - work items", "help", "workitem")]
     [InlineData("ado pr - pull requests", "pr", "merge", "142", "--help")]
+    [InlineData("ado metrics - development KPIs", "metrics", "--help")]
     public void HelpShowsTheCommandPageOrTheOverview(string heading, params string[] argv) =>
         Assert.StartsWith(heading, Program.HelpPage(Args.Parse(argv)));
 
@@ -39,6 +40,8 @@ public class ProgramTests
     [InlineData("frobnicate")]
     [InlineData("workitem", "list")]
     [InlineData("pr", "show", "142")]
+    [InlineData("metrics", "--area", "LogDB-Web", "--months", "12", "--format", "html", "--output", "metrics.html")]
+    [InlineData("metrics")]
     public void CommandsRunWithoutHelp(params string[] argv) =>
         Assert.Null(Program.HelpPage(Args.Parse(argv)));
 

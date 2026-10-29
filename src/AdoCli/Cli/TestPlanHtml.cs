@@ -13,6 +13,10 @@ public static class TestPlanHtml
         WebUtility.HtmlDecode(Regex.Replace(value ?? "", "<[^>]*>", " ")),
         @"\s+", " ").Trim();
     static string Label(string? value) => E(Plain(value));
+    private const string PassedColor = "#168567";
+    private const string FailedColor = "#c0392b";
+    private const string BlockedColor = "#bf8616";
+    private const string NotRunColor = "#667587";
 
     /// <summary>Renders standalone HTML with optional Shared Steps, progress, report sections and per-case execution badges.</summary>
     public static string Render(TestPlanFile file, IReadOnlyDictionary<int, IReadOnlyList<TestStep>>? sharedSteps = null, IReadOnlyDictionary<int, string>? sharedErrors = null, TestPlanProgress.Report? progress = null, bool excludeParameters = false, string? reportTitle = null, string? introductionHtml = null, string? closingHtml = null, IReadOnlyDictionary<(int SuiteId, int CaseId), string>? caseOutcomes = null)
@@ -116,10 +120,10 @@ public static class TestPlanHtml
                     var outcome = caseOutcomes.GetValueOrDefault((suite.Id, id), "NotRun");
                     var (color, label) = outcome switch
                     {
-                        "Passed" => ("#168567", "Passed"),
-                        "Failed" => ("#c0392b", "Failed"),
-                        "Blocked" => ("#bf8616", "Blocked"),
-                        _ => ("#667587", "Not run")
+                        "Passed" => (PassedColor, "Passed"),
+                        "Failed" => (FailedColor, "Failed"),
+                        "Blocked" => (BlockedColor, "Blocked"),
+                        _ => (NotRunColor, "Not run")
                     };
                     sb.Append(" <span class=\"badge\" style=\"display:inline-flex;align-items:center;gap:6px\">")
                         .Append("<span aria-hidden=\"true\" style=\"width:10px;height:10px;border-radius:50%;background:")

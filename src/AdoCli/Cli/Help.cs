@@ -274,10 +274,11 @@ public static class Help
 
         Usage:
           ado metrics --area <path> [--months 12] [--format html|json] [--output file]
+          ado metrics --scope repository --repo <name> [--months 12] [--format html|json] [--output file]
 
         PRs are attributed only through linked work items in the selected Area Path
         or its descendants. Unlinked PRs are excluded. Closed includes abandoned PRs.
-        Monthly counts and elapsed closure time use UTC dates.
+        Use --scope repository to include all PRs in a named repository without Area Path filtering.\n        Monthly counts and elapsed closure time use UTC dates.
 
         Examples:
           ado metrics --area "Product\\ALPHA" --months 12 --format html --output metrics.html

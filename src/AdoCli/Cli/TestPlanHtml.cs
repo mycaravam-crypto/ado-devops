@@ -251,6 +251,6 @@ public static class TestPlanHtml
             })();
             </script></body></html>
             """);
-        return sb.ToString();
+        return sb.ToString().Replace("<title>Test plan report</title>", "<title>" + E(reportTitle) + "</title>", StringComparison.Ordinal);
     }
 }

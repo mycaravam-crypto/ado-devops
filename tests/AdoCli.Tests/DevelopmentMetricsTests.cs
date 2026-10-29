@@ -134,4 +134,14 @@ public sealed class DevelopmentMetricsTests
         Assert.Contains("100% (0/0)", writer.ToString());
     }
 
+    [Theory]
+    [InlineData("LogDB-Web/XXX", "LogDB-Web\\XXX")]
+    [InlineData(" LogDB-Web/XXX/ ", "LogDB-Web\\XXX")]
+    [InlineData("LogDB-Web\\XXX", "LogDB-Web\\XXX")]
+    public void NormalizesAreaPathSeparators(string input, string expected)
+    {
+        Assert.Equal(expected, DevelopmentMetrics.NormalizeAreaPath(input));
+        Assert.True(TestPlanProgress.InsideArea(expected + "\\Child", expected));
+    }
+
 }

@@ -12,7 +12,8 @@ public static class DevelopmentMetrics
     public sealed record Month(string Period, int Opened, int Closed, double? AverageDays);
     public sealed record Report(string Format, string Project, string Area, DateTimeOffset GeneratedAt,
         int Months, int MatchedPullRequests, int UnlinkedPullRequests, int Opened, int Closed,
-        double? AverageDays, IReadOnlyList<Month> Timeline);
+        double? AverageDays, IReadOnlyList<Month> Timeline,
+        int Merged = 0, int Abandoned = 0, int OpenAtEnd = 0, double? MedianDays = null);
 
     public static Report Aggregate(string project, string area, int months, DateTimeOffset generatedAt,
         IEnumerable<PullRequest> matched, int unlinked)
@@ -31,7 +32,11 @@ public static class DevelopmentMetrics
         }
         var observedClosed = prs.Where(p => p.ClosedDate is { } date && date >= start && date < end).ToList();
         return new("ado.development-metrics/v1", project, area, generatedAt, months, prs.Count, unlinked,
-            rows.Sum(r => r.Opened), rows.Sum(r => r.Closed), AverageDays(observedClosed), rows);
+            rows.Sum(r => r.Opened), rows.Sum(r => r.Closed), AverageDays(observedClosed), rows,
+            observedClosed.Count(p => p.Status.Equals("completed", StringComparison.OrdinalIgnoreCase)),
+            observedClosed.Count(p => p.Status.Equals("abandoned", StringComparison.OrdinalIgnoreCase)),
+            prs.Count(p => p.CreationDate is { } created && created < end &&
+                (p.ClosedDate is null || p.ClosedDate >= end)), MedianDays(observedClosed));
     }
 
     public static double? AverageDays(IEnumerable<PullRequest> prs)
@@ -40,6 +45,19 @@ public static class DevelopmentMetrics
                 p.ClosedDate.Value >= p.CreationDate.Value)
             .Select(p => (p.ClosedDate!.Value - p.CreationDate!.Value).TotalDays).ToArray();
         return durations.Length == 0 ? null : Math.Round(durations.Average(), 1);
+    }
+
+    /// <summary>Median elapsed days for closed PRs with valid dates.</summary>
+    public static double? MedianDays(IEnumerable<PullRequest> prs)
+    {
+        var values = prs.Where(p => p.CreationDate.HasValue && p.ClosedDate.HasValue &&
+                p.ClosedDate.Value >= p.CreationDate.Value)
+            .Select(p => (p.ClosedDate!.Value - p.CreationDate!.Value).TotalDays)
+            .Order().ToArray();
+        if (values.Length == 0) return null;
+        var median = values.Length % 2 == 1 ? values[values.Length / 2] :
+            (values[values.Length / 2 - 1] + values[values.Length / 2]) / 2;
+        return Math.Round(median, 1);
     }
 
     /// <summary>Only explicitly linked work items with a matching Area Path qualify a PR.</summary>
@@ -99,6 +117,10 @@ public static class DevelopmentMetrics
             ("PRs opened", report.Opened.ToString(CultureInfo.InvariantCulture)),
             ("PRs closed", report.Closed.ToString(CultureInfo.InvariantCulture)),
             ("Average duration (days)", V(report.AverageDays)),
+            ("Median duration (days)", V(report.MedianDays)),
+            ("Merged PRs", report.Merged.ToString(CultureInfo.InvariantCulture)),
+            ("Abandoned PRs", report.Abandoned.ToString(CultureInfo.InvariantCulture)),
+            ("Open at period end", report.OpenAtEnd.ToString(CultureInfo.InvariantCulture)),
             ("PRs in selected area", report.MatchedPullRequests.ToString(CultureInfo.InvariantCulture))
         })
             sb.Append("<div class=\"kpi\"><strong>").Append(E(value)).Append("</strong><span>").Append(E(name)).Append("</span></div>");
@@ -113,12 +135,77 @@ public static class DevelopmentMetrics
                 .Append(m.Opened * 100 / max).Append("%\"></div><div class=\"bar closed\" style=\"width:")
                 .Append(m.Closed * 100 / max).Append("%\"></div></div></td></tr>");
         }
-        sb.Append("</tbody></table></div><h2>Scope and definitions</h2><p class=\"muted\">")
+        sb.Append("</tbody></table></div>").Append(InteractiveChart(report)).Append("<h2>Scope and definitions</h2><p class=\"muted\">")
             .Append("A PR belongs to the selected Area Path only if it is linked to at least one work item in that area or a child area. ")
             .Append("Unlinked PRs among the date-range candidates: ").Append(report.UnlinkedPullRequests).Append(". ")
             .Append("Opened and closed are separate monthly event counts, not a cohort conversion rate. ")
             .Append("Closed includes completed and abandoned PRs; average duration uses closure minus creation time and excludes records without valid dates. ")
             .Append("Missing or unlinked work items can cause undercounting. Times are UTC.</p></main></body></html>");
+        return sb.ToString();
+    }
+
+    /// <summary>Offline interactive chart with keyboard-accessible metric selection.</summary>
+    public static string InteractiveChart(Report report)
+    {
+        var sb = new StringBuilder();
+        sb.Append("<section aria-label=\"Monthly KPI chart\"><h2>Interactive monthly trend</h2>")
+            .Append("<p class=\"muted\">Choose a metric; hover over a bar or select a month to inspect values.</p>")
+            .Append("<div class=\"metric-controls\"><button type=\"button\" class=\"metric-choice\" data-metric=\"opened\" aria-pressed=\"true\">Opened</button>")
+            .Append("<button type=\"button\" class=\"metric-choice\" data-metric=\"closed\" aria-pressed=\"false\">Closed</button>")
+            .Append("<button type=\"button\" class=\"metric-choice\" data-metric=\"duration\" aria-pressed=\"false\">Average days to close</button></div>")
+            .Append("<div id=\"metric-chart\" class=\"metric-chart\" role=\"group\" aria-label=\"Monthly metric values\">");
+        foreach (var month in report.Timeline)
+        {
+            sb.Append("<button type=\"button\" class=\"metric-month\" data-period=\"")
+                .Append(month.Period).Append("\" data-opened=\"").Append(month.Opened)
+                .Append("\" data-closed=\"").Append(month.Closed).Append("\" data-duration=\"")
+                .Append(month.AverageDays?.ToString("0.#", CultureInfo.InvariantCulture) ?? "")
+                .Append("\"><span class=\"metric-amount\"></span><span class=\"metric-column\"><span class=\"metric-fill\"></span></span>")
+                .Append("<span class=\"metric-period\">").Append(month.Period).Append("</span></button>");
+        }
+        sb.Append("</div><p id=\"metric-selection\" class=\"muted\" aria-live=\"polite\">Select a month for details.</p></section>");
+        sb.Append("""
+            <style>
+              .metric-controls{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}
+              .metric-choice{font:inherit;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer}
+              .metric-choice[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);font-weight:700}
+              .metric-chart{display:flex;gap:8px;overflow-x:auto;align-items:stretch;padding:12px 0 8px;border-bottom:1px solid var(--line)}
+              .metric-month{font:inherit;cursor:pointer;flex:1 0 56px;min-width:56px;max-width:120px;display:flex;flex-direction:column;align-items:center;gap:6px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--text);padding:8px 3px}
+              .metric-month:hover,.metric-month:focus-visible{border-color:var(--accent)}
+              .metric-month[aria-pressed="true"]{background:var(--canvas);border-color:var(--accent)}
+              .metric-column{width:24px;height:135px;display:flex;align-items:flex-end;background:var(--canvas);border-radius:5px;overflow:hidden}
+              .metric-fill{display:block;width:100%;min-height:2px;background:var(--accent);border-radius:4px 4px 0 0}
+              .metric-period{font-size:11px;white-space:nowrap}.metric-amount{font-size:12px;font-weight:700}
+              @media print{.metric-choice{display:none}.metric-chart{overflow:visible}.metric-month{min-width:0;flex-basis:0}.metric-fill{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+            </style>
+            <script>
+            (() => {
+              const chart = document.getElementById('metric-chart');
+              if (!chart) return;
+              const months = [...chart.querySelectorAll('.metric-month')];
+              const choices = [...document.querySelectorAll('.metric-choice')];
+              const detail = document.getElementById('metric-selection');
+              const value = (node, metric) => Number(node.dataset[metric] || 0);
+              function render(metric) {
+                const max = Math.max(1, ...months.map(node => value(node, metric)));
+                choices.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.metric === metric)));
+                months.forEach(node => {
+                  const amount = value(node, metric);
+                  const isDuration = metric === 'duration';
+                  node.querySelector('.metric-fill').style.height = (amount / max * 100) + '%';
+                  node.querySelector('.metric-amount').textContent = isDuration ? (node.dataset.duration || 'n/a') : amount;
+                  node.title = node.dataset.period + ': ' + (isDuration ? 'Average days' : metric) + ' ' + (isDuration ? (node.dataset.duration || 'n/a') : amount);
+                });
+              }
+              choices.forEach(button => button.addEventListener('click', () => render(button.dataset.metric)));
+              months.forEach(node => node.addEventListener('click', () => {
+                months.forEach(other => other.setAttribute('aria-pressed', String(other === node)));
+                detail.textContent = node.dataset.period + ': opened ' + node.dataset.opened + ', closed ' + node.dataset.closed + ', average days ' + (node.dataset.duration || 'n/a');
+              }));
+              render('opened');
+            })();
+            </script>
+            """);
         return sb.ToString();
     }
 

@@ -278,7 +278,7 @@ public static class Help
 
         PRs are attributed only through linked work items in the selected Area Path
         or its descendants. Unlinked PRs are excluded. Closed includes abandoned PRs.
-        Use --scope repository to include all PRs in a named repository without Area Path filtering.\n        Monthly counts and elapsed closure time use UTC dates.
+        Use --scope repository to include all PRs in a named repository without Area Path filtering.\n        Progress messages are written to stderr (safe for JSON/HTML on stdout).\n        Monthly counts and elapsed closure time use UTC dates.
 
         Examples:
           ado metrics --area "Product\\ALPHA" --months 12 --format html --output metrics.html

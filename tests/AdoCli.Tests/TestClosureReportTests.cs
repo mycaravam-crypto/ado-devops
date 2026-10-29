@@ -23,7 +23,7 @@ public sealed class TestClosureReportTests
     [Fact]
     public void SummaryEscapesUntrustedProjectAndArea()
     {
-        var progress = new TestPlanProgress.Report(12, "Release", "<img src=x>", 14, 0, 0, 0, 0, 0, []);
+        var progress = new TestPlanProgress.Report(12, "Release", "<img src=x>", 14, 0, 0, 0, 0, 0, [], []);
         var report = TestClosureReport.FromProgress("<script>", progress, DateTimeOffset.UtcNow);
         var html = TestClosureReport.SummaryHtml(report);
         Assert.Contains("&lt;script&gt;", html);

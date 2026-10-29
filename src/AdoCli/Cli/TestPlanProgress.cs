@@ -101,7 +101,7 @@ public static class TestPlanProgress
     {
         static string E(string? v) => WebUtility.HtmlEncode(v ?? "");
         var sb = new StringBuilder();
-        sb.Append("<section id=\"progress\"><h2>Test execution details</h2>");
+        sb.Append(includeSummary ? "<section id=\"progress\"><h2>Test progress</h2>" : "<section id=\"progress\"><h2>Test execution details</h2>");
         if (includeSummary)
         {
                 sb.Append("<p class=\"muted\">Generated (UTC): ")

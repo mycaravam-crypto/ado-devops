@@ -269,6 +269,21 @@ public static class Help
           ado testplan import plan.json --yes
         """;
 
+    const string Metrics = """
+        ado metrics - development KPIs for an Azure DevOps Area Path
+
+        Usage:
+          ado metrics --area <path> [--months 12] [--format html|json] [--output file]
+
+        PRs are attributed only through linked work items in the selected Area Path
+        or its descendants. Unlinked PRs are excluded. Closed includes abandoned PRs.
+        Monthly counts and elapsed closure time use UTC dates.
+
+        Examples:
+          ado metrics --area "Product\\ALPHA" --months 12 --format html --output metrics.html
+          ado metrics --area "Product\\ALPHA" --format json
+        """;
+
     const string Build = """
         ado build - builds
 
@@ -293,6 +308,7 @@ public static class Help
         "commit" => Commit,
         "workitem" => WorkItem,
         "testplan" => TestPlan,
+        "metrics" => Metrics,
         "build" => Build,
         _ => null,
     };

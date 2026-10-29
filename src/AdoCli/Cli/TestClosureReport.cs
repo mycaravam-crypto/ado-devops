@@ -88,6 +88,31 @@ public static class TestClosureReport
         </style>
         """;
 
+    /// <summary>Aggregate configurations per suite/case; failures take precedence over success.</summary>
+    public static string CaseOutcome(IEnumerable<string?> outcomes)
+    {
+        var values = outcomes.Select(TestPlanProgress.Outcome).ToHashSet(StringComparer.Ordinal);
+        if (values.Contains("Failed")) return "Failed";
+        if (values.Contains("Blocked")) return "Blocked";
+        if (values.Contains("NotRun")) return "NotRun";
+        return values.Contains("Passed") ? "Passed" : "NotRun";
+    }
+
+    public static async Task<Dictionary<(int SuiteId, int CaseId), string>> CaseOutcomesAsync(
+        AdoClient client, string project, int planId, TestPlanFile scoped)
+    {
+        var output = new Dictionary<(int SuiteId, int CaseId), string>();
+        foreach (var suite in scoped.Suites ?? [])
+        {
+            var selected = suite.TestCaseIds.ToHashSet();
+            var points = await client.GetTestPointsAsync(project, planId, suite.Id);
+            foreach (var group in points.Where(point => selected.Contains(TestPlanProgress.CaseId(point)))
+                         .GroupBy(point => TestPlanProgress.CaseId(point)))
+                output[(suite.Id, group.Key)] = CaseOutcome(group.Select(point => point.Outcome));
+        }
+        return output;
+    }
+
     public static async Task<int> RunAsync(Context ctx)
     {
         var id = ctx.Id("testplan report <id> [--area path] [--format html|json|pdf] [--output file]");
@@ -110,9 +135,10 @@ public static class TestClosureReport
             // Reuse the established offline HTML shell. Parameter values are excluded for safer sharing.
             var (shared, errors) = await TestPlanCommands.ResolveSharedStepsAsync(ctx.Client, file);
             var scoped = FilterByArea(file, report.Area);
+            var caseOutcomes = await CaseOutcomesAsync(ctx.Client, project, id, scoped);
             output = TestPlanHtml.Render(scoped, shared, errors, progress, excludeParameters: true,
                 reportTitle: "Test closure report", introductionHtml: SummaryHtml(report),
-                closingHtml: SignatureHtml());
+                closingHtml: SignatureHtml(), caseOutcomes: caseOutcomes);
         }
         if (format == "pdf")
         {

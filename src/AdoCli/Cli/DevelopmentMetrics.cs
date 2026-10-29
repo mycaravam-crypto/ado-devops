@@ -67,10 +67,15 @@ public static class DevelopmentMetrics
         (pr.ClosedDate is null && pr.CreationDate is { } older && older < cutoff &&
             pr.Status.Equals("active", StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>Azure DevOps Area Paths use backslashes; accept slash-separated CLI input.</summary>
+    public static string NormalizeAreaPath(string area) =>
+        area.Trim().Replace('/', '\\').TrimEnd('\\');
+
     /// <summary>Only explicitly linked work items with a matching Area Path qualify a PR; optional callback receives processed, total, matched and unlinked counts.</summary>
     public static async Task<(List<PullRequest> Matched, int Unlinked)> CollectAsync(
         AdoClient client, string project, string area, int months, Action<int, int, int, int>? progress = null)
     {
+        area = NormalizeAreaPath(area);
         var all = await client.GetPullRequestsAsync(project, null, "all", null);
         var cutoff = new DateTimeOffset(DateTimeOffset.UtcNow.Year, DateTimeOffset.UtcNow.Month, 1,
             0, 0, 0, TimeSpan.Zero).AddMonths(1 - months);
@@ -98,7 +103,7 @@ public static class DevelopmentMetrics
     /// <summary>Report why Area Path matching did not find linked PRs.</summary>
     public static string NoMatchesMessage(string area, int unlinked) =>
         $"No pull requests were matched to Area Path '{area}'. " +
-        $"{unlinked} candidate PR(s) have no linked work items. " +
+        $"{unlinked} candidate PR(s) have no linked work items; the other candidates have links but none match the specified area. " +
         "Azure DevOps PRs have no Area Path of their own. Link PRs to work items in this area " +
         "or use --scope repository --repo <name> for repository-wide metrics (not Area Path metrics).";
 
@@ -264,6 +269,12 @@ public static class DevelopmentMetrics
             throw AdoException.Usage("--months must be between 1 and 60");
         var project = ctx.RequireProject();
         var scope = ctx.Args.Get("--scope") ?? "area";
+        if (scope == "area" && area is not null)
+        {
+            var normalized = NormalizeAreaPath(area);
+            if (normalized != area) Console.Error.WriteLine($"Normalized Area Path: {normalized}");
+            area = normalized;
+        }
         if (scope is not ("area" or "repository"))
             throw AdoException.Usage("--scope must be area or repository");
         Console.Error.WriteLine($"Metrics: project={project}, scope={scope}, months={months}");

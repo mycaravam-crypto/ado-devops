@@ -15,11 +15,12 @@ public static class TestPlanHtml
     static string Label(string? value) => E(Plain(value));
 
     /// <summary>Renders the complete offline test plan report, optionally including resolved Shared Steps and test progress.</summary>
-    public static string Render(TestPlanFile file, IReadOnlyDictionary<int, IReadOnlyList<TestStep>>? sharedSteps = null, IReadOnlyDictionary<int, string>? sharedErrors = null, TestPlanProgress.Report? progress = null, bool excludeParameters = false)
+    public static string Render(TestPlanFile file, IReadOnlyDictionary<int, IReadOnlyList<TestStep>>? sharedSteps = null, IReadOnlyDictionary<int, string>? sharedErrors = null, TestPlanProgress.Report? progress = null, bool excludeParameters = false, string? reportTitle = null, string? introductionHtml = null)
     {
         var plan = file.Plan ?? throw new ArgumentException("Missing plan.");
         var generatedAt = DateTimeOffset.UtcNow;
         var suites = file.Suites ?? [];
+        reportTitle ??= "Test plan report";
         var cases = (file.TestCases ?? []).ToDictionary(c => c.Id);
         var children = suites.ToLookup(s => s.ParentId);
         var visited = new HashSet<int>();
@@ -80,7 +81,9 @@ public static class TestPlanHtml
         }
         foreach (var suite in suites.Where(s => s.ParentId is null || suites.All(p => p.Id != s.ParentId))) Nav(suite);
         foreach (var suite in suites) Nav(suite);
-        sb.Append("</ul></nav><main><div class=\"eyebrow\">Test plan #").Append(plan.Id)
+        sb.Append("</ul></nav><main>");
+        if (introductionHtml is not null) sb.Append(introductionHtml);
+        sb.Append("<div class=\"eyebrow\">Test plan #").Append(plan.Id)
             .Append("</div><h1>").Append(E(plan.Name)).Append("</h1><p class=\"muted\">")
             .Append(E(file.Project)).Append("</p><div class=\"meta\"><span>Status: ")
             .Append(E(plan.State)).Append("</span><span>Iteration: ").Append(E(plan.Iteration))

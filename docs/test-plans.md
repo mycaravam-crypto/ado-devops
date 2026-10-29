@@ -24,6 +24,15 @@ Use `export` when you need a portable edit/import document. In `show`, expected 
 HTML is a self-contained, read-only report with a DocWizz-style collapsible suite tree, sidebar filtering, active-section highlighting and a responsive mobile navigation drawer, and DocWizz-style light/dark theme switching (with system preference detection). It includes suite navigation, per-case Area Path, local parameter value tables, and tables of actions and expected results. The JSON export also includes `Microsoft.VSTS.TCM.Parameters` and `Microsoft.VSTS.TCM.LocalDataSource` in each test case’s `fields` (alongside the existing `System.AreaPath`). Shared parameter sets are not expanded; parameter values may contain sensitive test data, so protect exported files accordingly. Import continues to use JSON only.
 Shared Steps references are resolved recursively in the HTML report from the referenced work item's `Microsoft.VSTS.TCM.Steps` field. Custom or localized work-item type names are supported; the export does not require the literal type name `Shared Steps`. A missing/inaccessible reference or empty steps field is shown as a warning in the report. Cyclic references are detected. The original shared-step references remain unchanged in JSON exports and imports.
 
+## Test closure report (MVP)
+
+```bash
+ado testplan report 12 --format html --output closure.html
+ado testplan report 12 --area "Product\\ALPHA" --format json --output closure.json
+```
+
+A read-only, point-based closure snapshot with generated UTC timestamp, total test points, Passed/Failed/Blocked/Not Run, execution rate, pass rate and suite counts. HTML reuses the standalone test-plan layout (including the progress section) and excludes local test parameters by default; the report still includes test-plan case descriptions and shared steps, so review it before sharing. JSON uses the `ado.test-closure/v1` schema. Results are current test-point outcomes, **not** an end-of-period snapshot. This first version does not evaluate defects, risk acceptance or release approval. No work items are changed.
+
 ## Test coverage by Area Path
 
 `ado testplan coverage <id> --area <path>` produces a read-only report for **one** test plan and software area (including child Area Paths). This keeps historically different software projects such as ALPHA and GAMMA separate even if their code shares one repository and uses different branches. Git branches do not affect the calculation.

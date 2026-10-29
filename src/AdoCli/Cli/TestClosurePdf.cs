@@ -29,7 +29,8 @@ public static class TestClosurePdf
             process.StartInfo.ArgumentList.Add("--no-first-run");
             process.StartInfo.ArgumentList.Add("--disable-extensions");
             process.StartInfo.ArgumentList.Add("--no-pdf-header-footer");
-            process.StartInfo.ArgumentList.Add("--print-to-pdf=" + target);
+            var generated = Path.Combine(scratch, "report.pdf");
+            process.StartInfo.ArgumentList.Add("--print-to-pdf=" + generated);
             process.StartInfo.ArgumentList.Add(new Uri(source).AbsoluteUri);
             process.Start();
             var stderr = process.StandardError.ReadToEndAsync();
@@ -44,8 +45,9 @@ public static class TestClosurePdf
                 throw new AdoException("PDF browser timed out.");
             }
             var errors = await stderr;
-            if (process.ExitCode != 0 || !File.Exists(target) || new FileInfo(target).Length == 0)
+            if (process.ExitCode != 0 || !File.Exists(generated) || new FileInfo(generated).Length == 0)
                 throw new AdoException($"PDF browser failed (exit {process.ExitCode}): {errors}");
+            File.Move(generated, target, overwrite: true);
         }
         finally
         {

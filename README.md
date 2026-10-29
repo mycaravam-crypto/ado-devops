@@ -116,3 +116,13 @@ No dependencies beyond .NET (tests use xUnit and a stub HTTP handler, no server 
 enforces that layering on every PR. Code layout and versioning: [docs/development.md](docs/development.md). Every merge to `main` is released as the next SemVer tag; a PR label picks the
 bump: `release:patch` (default), `release:minor`, `release:major` or `release:none`. Scope and non-goals:
 [PLAN.md](PLAN.md).
+
+### Development metrics by Area Path
+
+```bash
+ado metrics --area "Product\\ALPHA" --months 12 --format html --output metrics.html
+ado metrics --area "Product\\ALPHA" --months 6 --format json --output metrics.json
+```
+
+Generates a read-only monthly dashboard with PRs opened and closed, average time from creation to closure, and a monthly trend. PRs are attributed to an Area Path **only via explicitly linked Azure DevOps work items** in that area or its children; PRs without such links are not assigned. Closed includes completed and abandoned PRs. All monthly boundaries use UTC. This is PR throughput and elapsed time, not a measure of developer productivity or quality. Some linked work items may be inaccessible and therefore missing from the report.
+

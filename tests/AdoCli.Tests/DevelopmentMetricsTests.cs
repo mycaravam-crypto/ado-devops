@@ -144,4 +144,19 @@ public sealed class DevelopmentMetricsTests
         Assert.True(TestPlanProgress.InsideArea(expected + "\\Child", expected));
     }
 
+    [Fact]
+    public void DashboardShowsInteractiveLineChartAboveKpiCards()
+    {
+        var report = DevelopmentMetrics.Aggregate("Project", "Area", 2,
+            new DateTimeOffset(2026, 10, 29, 0, 0, 0, TimeSpan.Zero), [], 0);
+        var html = DevelopmentMetrics.Html(report);
+        Assert.Contains("KPI development", html);
+        Assert.Contains("<polyline", html);
+        Assert.Contains("data-series=\"opened\"", html);
+        Assert.Contains("data-series=\"closed\"", html);
+        Assert.Contains("data-series=\"duration\"", html);
+        Assert.True(html.IndexOf("top-trend", StringComparison.Ordinal) <
+                    html.IndexOf("class=\"kpis\"", StringComparison.Ordinal));
+    }
+
 }

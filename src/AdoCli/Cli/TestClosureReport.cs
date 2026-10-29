@@ -14,7 +14,7 @@ public static class TestClosureReport
         IReadOnlyList<TestPlanProgress.SuiteProgress> Suites)
     {
         public int Executed => Passed + Failed;
-        public int Open => Blocked + NotRun + Failed;
+        public int Outstanding => Blocked + NotRun + Failed;
     }
 
     public static Report FromProgress(string project, TestPlanProgress.Report progress, DateTimeOffset generatedAt) =>
@@ -44,12 +44,27 @@ public static class TestClosureReport
         })
             sb.Append("<span>").Append(name).Append(": ").Append(E(value)).Append("</span>");
         sb.Append("</div><p>Outstanding results (failed, blocked or not run): ")
-            .Append(report.Open).Append(".</p>")
+            .Append(report.Outstanding).Append(".</p>")
             .Append("<p class=\"muted\">Results are current test-point outcomes (suite × case × configuration). ")
             .Append("Executed means Passed + Failed; no-run and blocked points are not executed. ")
             .Append("This is a factual snapshot, not a release approval or a historical end-of-period snapshot.</p>")
             .Append("</section>");
         return sb.ToString();
+    }
+
+    /// <summary>Keep case and suite details within the same Area Path as point metrics.</summary>
+    public static TestPlanFile FilterByArea(TestPlanFile file, string? area)
+    {
+        if (string.IsNullOrWhiteSpace(area)) return file;
+        var cases = (file.TestCases ?? []).Where(c => c.Fields is not null &&
+            c.Fields.TryGetValue("System.AreaPath", out var path) &&
+            TestPlanProgress.InsideArea(path ?? "", area)).ToList();
+        var ids = cases.Select(c => c.Id).ToHashSet();
+        var suites = (file.Suites ?? []).Select(s => s with
+        {
+            TestCaseIds = s.TestCaseIds.Where(ids.Contains).ToList()
+        }).Where(s => s.TestCaseIds.Count > 0).ToList();
+        return file with { Suites = suites, TestCases = cases };
     }
 
     public static async Task<int> RunAsync(Context ctx)
@@ -71,9 +86,9 @@ public static class TestClosureReport
             var file = await TestPlanCommands.ExportAsync(ctx.Client, project, id);
             // Reuse the established offline HTML shell. Parameter values are excluded for safer sharing.
             var (shared, errors) = await TestPlanCommands.ResolveSharedStepsAsync(ctx.Client, file);
-            var html = TestPlanHtml.Render(file, shared, errors, progress, excludeParameters: true);
-            output = html.Replace("<title>Test plan report</title>", "<title>Test closure report</title>", StringComparison.Ordinal)
-                .Replace("<main><div class=\"eyebrow\">", "<main>" + SummaryHtml(report) + "<div class=\"eyebrow\">", StringComparison.Ordinal);
+            var scoped = FilterByArea(file, report.Area);
+            output = TestPlanHtml.Render(scoped, shared, errors, progress, excludeParameters: true,
+                reportTitle: "Test closure report", introductionHtml: SummaryHtml(report));
         }
         if (ctx.Args.Get("--output") is { } path)
         {

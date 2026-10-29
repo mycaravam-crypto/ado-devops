@@ -88,6 +88,7 @@ public static class Program
             ("workitem", "search") => WorkItemCommands.SearchAsync(ctx),
             ("workitem", "create") => WorkItemCommands.CreateAsync(ctx),
             ("workitem", "edit") => WorkItemCommands.EditAsync(ctx),
+            ("metrics", _) => DevelopmentMetrics.RunAsync(ctx),
             ("testplan", "list") => TestPlanCommands.ListAsync(ctx),
             ("testplan", "show") => TestPlanCommands.ShowAsync(ctx),
             ("testplan", "export") => TestPlanCommands.ExportAsync(ctx),

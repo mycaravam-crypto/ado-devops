@@ -14,7 +14,7 @@ public sealed class TestClosureReportTests
         var closure = TestClosureReport.FromProgress("Project", progress, timestamp);
         Assert.Equal("ado.test-closure/v1", closure.Format);
         Assert.Equal(3, closure.Executed);
-        Assert.Equal(3, closure.Open);
+        Assert.Equal(3, closure.Outstanding);
         Assert.Equal(60, closure.ExecutionPercent);
         Assert.Equal(66.7, closure.PassPercent);
         Assert.Equal(timestamp, closure.GeneratedAt);
@@ -32,5 +32,35 @@ public sealed class TestClosureReportTests
         Assert.DoesNotContain("<img src=x>", html);
         Assert.Contains("not a release approval", html);
         Assert.Contains("Test points", html);
+    }
+
+    [Fact]
+    public void AreaScopedHtmlExcludesUnrelatedCases()
+    {
+        var file = new TestPlanFile(TestPlanFile.CurrentFormat, "Project",
+            new PlanInfo(12, "Release", "Active", null, 10),
+            [new SuiteInfo(10, "Mixed suite", "StaticTestSuite", null, [1, 2])],
+            [
+                new TestCaseEntry(1, 1, "Alpha only",
+                    new Dictionary<string, string> { ["System.AreaPath"] = "Product\\ALPHA\\Web" }, []),
+                new TestCaseEntry(2, 1, "Beta only",
+                    new Dictionary<string, string> { ["System.AreaPath"] = "Product\\BETA" }, [])
+            ]);
+        var scoped = TestClosureReport.FilterByArea(file, "Product\\ALPHA");
+        var html = TestPlanHtml.Render(scoped, reportTitle: "Test closure report",
+            introductionHtml: "<section id=\"closure\">Summary</section>");
+        Assert.Contains("Alpha only", html);
+        Assert.DoesNotContain("Beta only", html);
+        Assert.Contains("<title>Test closure report</title>", html);
+        Assert.Equal(1, html.Split("id=\"closure\"").Length - 1);
+    }
+    [Fact]
+    public void SignatureFieldsAppearForBothPartiesWithoutPretendingToBeSigned()
+    {
+        var html = TestClosureReport.SignatureHtml();
+        Assert.Contains("Kunde / Customer", html);
+        Assert.Contains("Lieferant / Supplier", html);
+        Assert.Contains("signature-line", html);
+        Assert.Contains("not automatic approval", html);
     }
 }

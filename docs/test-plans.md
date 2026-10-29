@@ -28,10 +28,11 @@ Shared Steps references are resolved recursively in the HTML report from the ref
 
 ```bash
 ado testplan report 12 --format html --output closure.html
+ado testplan report 12 --format pdf --output closure.pdf
 ado testplan report 12 --area "Product\\ALPHA" --format json --output closure.json
 ```
 
-A read-only, point-based closure snapshot with generated UTC timestamp, total test points, Passed/Failed/Blocked/Not Run, execution rate, pass rate and suite counts. HTML reuses the standalone test-plan layout (including the progress section) and excludes local test parameters by default; the report still includes test-plan case descriptions and shared steps, so review it before sharing. JSON uses the `ado.test-closure/v1` schema. Results are current test-point outcomes, **not** an end-of-period snapshot. This first version does not evaluate defects, risk acceptance or release approval. No work items are changed.
+The HTML and PDF closure reports contain blank customer and supplier signature lines for handwritten sign-off; these are not cryptographic signatures or automatic approval. PDF export uses a locally installed Chromium/Google Chrome browser (set `ADO_PDF_BROWSER` to an absolute executable path if auto-discovery fails), and requires `--output`.\n\nA read-only, point-based closure snapshot with generated UTC timestamp, total test points, Passed/Failed/Blocked/Not Run, execution rate, pass rate and suite counts. HTML reuses the standalone test-plan layout (including the progress section) and excludes local test parameters by default; the report still includes test-plan case descriptions and shared steps, so review it before sharing. JSON uses the `ado.test-closure/v1` schema. Results are current test-point outcomes, **not** an end-of-period snapshot. This first version does not evaluate defects, risk acceptance or release approval. No work items are changed.
 
 ## Test coverage by Area Path
 

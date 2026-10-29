@@ -1,6 +1,7 @@
 namespace AdoCli.Cli;
 
 using System.Net;
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using AdoCli.Api;
@@ -14,7 +15,7 @@ public static class TestClosureReport
         IReadOnlyList<TestPlanProgress.SuiteProgress> Suites)
     {
         public int Executed => Passed + Failed;
-        public int Open => Blocked + NotRun + Failed;
+        public int Outstanding => Blocked + NotRun + Failed;
     }
 
     public static Report FromProgress(string project, TestPlanProgress.Report progress, DateTimeOffset generatedAt) =>
@@ -44,7 +45,7 @@ public static class TestClosureReport
         })
             sb.Append("<span>").Append(name).Append(": ").Append(E(value)).Append("</span>");
         sb.Append("</div><p>Outstanding results (failed, blocked or not run): ")
-            .Append(report.Open).Append(".</p>")
+            .Append(report.Outstanding).Append(".</p>")
             .Append("<p class=\"muted\">Results are current test-point outcomes (suite × case × configuration). ")
             .Append("Executed means Passed + Failed; no-run and blocked points are not executed. ")
             .Append("This is a factual snapshot, not a release approval or a historical end-of-period snapshot.</p>")
@@ -52,12 +53,49 @@ public static class TestClosureReport
         return sb.ToString();
     }
 
+    /// <summary>Keep case and suite details within the same Area Path as point metrics.</summary>
+    public static TestPlanFile FilterByArea(TestPlanFile file, string? area)
+    {
+        if (string.IsNullOrWhiteSpace(area)) return file;
+        var cases = (file.TestCases ?? []).Where(c => c.Fields is not null &&
+            c.Fields.TryGetValue("System.AreaPath", out var path) &&
+            TestPlanProgress.InsideArea(path ?? "", area)).ToList();
+        var ids = cases.Select(c => c.Id).ToHashSet();
+        var suites = (file.Suites ?? []).Select(s => s with
+        {
+            TestCaseIds = s.TestCaseIds.Where(ids.Contains).ToList()
+        }).Where(s => s.TestCaseIds.Count > 0).ToList();
+        return file with { Suites = suites, TestCases = cases };
+    }
+
+    /// <summary>Empty signature lines for handwritten sign-off; not a digital signature.</summary>
+    public static string SignatureHtml() => """
+        <section id="signatures" class="closure-signatures">
+          <h2>Sign-off / Unterschriften</h2>
+          <p class="muted">Signatures document review, not automatic approval of test results.</p>
+          <div class="signature-grid">
+            <div><h3>Kunde / Customer</h3><div class="signature-line"></div><p>Name / Funktion</p><div class="signature-line"></div><p>Ort, Datum / Unterschrift</p></div>
+            <div><h3>Lieferant / Supplier</h3><div class="signature-line"></div><p>Name / Funktion</p><div class="signature-line"></div><p>Ort, Datum / Unterschrift</p></div>
+          </div>
+        </section>
+        <style>
+          .signature-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin:24px 0}
+          .signature-grid>div{break-inside:avoid}
+          .signature-line{height:52px;border-bottom:1px solid var(--ink)}
+          .closure-signatures{break-inside:avoid}
+          @media(max-width:650px){.signature-grid{grid-template-columns:1fr}}
+          @media print{.closure-signatures{break-before:page}}
+        </style>
+        """;
+
     public static async Task<int> RunAsync(Context ctx)
     {
-        var id = ctx.Id("testplan report <id> [--area path] [--format html|json] [--output file]");
+        var id = ctx.Id("testplan report <id> [--area path] [--format html|json|pdf] [--output file]");
         var format = ctx.Args.Get("--format") ?? (ctx.Json ? "json" : "html");
-        if (format is not ("html" or "json"))
-            throw AdoException.Usage("--format must be html or json");
+        if (format is not ("html" or "json" or "pdf"))
+            throw AdoException.Usage("--format must be html, json or pdf");
+        if (format == "pdf" && string.IsNullOrWhiteSpace(ctx.Args.Get("--output")))
+            throw AdoException.Usage("--output is required for PDF export");
         var project = ctx.RequireProject();
         var progress = await TestPlanProgress.BuildAsync(ctx.Client, project, id, ctx.Args.Get("--area"));
         var report = FromProgress(project, progress, DateTimeOffset.UtcNow);
@@ -71,9 +109,15 @@ public static class TestClosureReport
             var file = await TestPlanCommands.ExportAsync(ctx.Client, project, id);
             // Reuse the established offline HTML shell. Parameter values are excluded for safer sharing.
             var (shared, errors) = await TestPlanCommands.ResolveSharedStepsAsync(ctx.Client, file);
-            var html = TestPlanHtml.Render(file, shared, errors, progress, excludeParameters: true);
-            output = html.Replace("<title>Test plan report</title>", "<title>Test closure report</title>", StringComparison.Ordinal)
-                .Replace("<main><div class=\"eyebrow\">", "<main>" + SummaryHtml(report) + "<div class=\"eyebrow\">", StringComparison.Ordinal);
+            var scoped = FilterByArea(file, report.Area);
+            output = TestPlanHtml.Render(scoped, shared, errors, progress, excludeParameters: true,
+                reportTitle: "Test closure report", introductionHtml: SummaryHtml(report) + SignatureHtml());
+        }
+        if (format == "pdf")
+        {
+            await TestClosurePdf.WriteAsync(output, ctx.Args.Get("--output")!);
+            Console.Error.WriteLine($"Wrote test closure PDF to {ctx.Args.Get("--output")}");
+            return 0;
         }
         if (ctx.Args.Get("--output") is { } path)
         {

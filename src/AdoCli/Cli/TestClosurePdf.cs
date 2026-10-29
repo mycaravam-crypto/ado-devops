@@ -1,6 +1,7 @@
 namespace AdoCli.Cli;
 
 using System.Diagnostics;
+using AdoCli.Api;
 
 /// <summary>Prints the already generated standalone HTML to PDF using a locally installed Chromium browser.</summary>
 public static class TestClosurePdf

@@ -67,9 +67,9 @@ public static class DevelopmentMetrics
         (pr.ClosedDate is null && pr.CreationDate is { } older && older < cutoff &&
             pr.Status.Equals("active", StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>Only explicitly linked work items with a matching Area Path qualify a PR.</summary>
+    /// <summary>Only explicitly linked work items with a matching Area Path qualify a PR; optional callback receives processed, total, matched and unlinked counts.</summary>
     public static async Task<(List<PullRequest> Matched, int Unlinked)> CollectAsync(
-        AdoClient client, string project, string area, int months)
+        AdoClient client, string project, string area, int months, Action<int, int, int, int>? progress = null)
     {
         var all = await client.GetPullRequestsAsync(project, null, "all", null);
         var cutoff = new DateTimeOffset(DateTimeOffset.UtcNow.Year, DateTimeOffset.UtcNow.Month, 1,
@@ -78,16 +78,29 @@ public static class DevelopmentMetrics
         var candidates = all.Where(p => IsCandidate(p, cutoff)).ToList();
         var matched = new List<PullRequest>();
         var unlinked = 0;
+        var processed = 0;
         foreach (var pr in candidates)
         {
             var ids = await client.GetPullRequestWorkItemIdsAsync(pr);
-            if (ids.Count == 0) { unlinked++; continue; }
-            var items = await client.GetWorkItemsAsync(ids.Distinct(), ["System.AreaPath"]);
-            if (items.Any(w => TestPlanProgress.InsideArea(w.Field("System.AreaPath"), area)))
-                matched.Add(pr);
+            if (ids.Count == 0) unlinked++;
+            else
+            {
+                var items = await client.GetWorkItemsAsync(ids.Distinct(), ["System.AreaPath"]);
+                if (items.Any(w => TestPlanProgress.InsideArea(w.Field("System.AreaPath"), area)))
+                    matched.Add(pr);
+            }
+            progress?.Invoke(++processed, candidates.Count, matched.Count, unlinked);
         }
+        if (candidates.Count == 0) progress?.Invoke(0, 0, 0, 0);
         return (matched, unlinked);
     }
+
+    /// <summary>Report why Area Path matching did not find linked PRs.</summary>
+    public static string NoMatchesMessage(string area, int unlinked) =>
+        $"No pull requests were matched to Area Path '{area}'. " +
+        $"{unlinked} candidate PR(s) have no linked work items. " +
+        "Azure DevOps PRs have no Area Path of their own. Link PRs to work items in this area " +
+        "or use --scope repository --repo <name> for repository-wide metrics (not Area Path metrics).";
 
     public static string Html(Report report)
     {
@@ -214,10 +227,34 @@ public static class DevelopmentMetrics
         return sb.ToString();
     }
 
+    /// <summary>Write bounded progress updates to stderr, leaving stdout machine-readable.</summary>
+    private const int ProgressBarWidth = 20;
+    private const int ProgressUpdateIntervalPercent = 5;
+
+    public static Action<int, int, int, int> Progress(TextWriter writer, bool interactive)
+    {
+        var lastPercent = -1;
+        return (done, total, matched, unlinked) =>
+        {
+            var percent = total == 0 ? 100 : done * 100 / total;
+            if (done != total && percent / ProgressUpdateIntervalPercent == lastPercent / ProgressUpdateIntervalPercent) return;
+            lastPercent = percent;
+            var width = ProgressBarWidth;
+            var filled = percent * width / 100;
+            var line = $"[{new string('#', filled)}{new string('-', width - filled)}] {percent,3}% ({done}/{total}) matched: {matched}, unlinked: {unlinked}";
+            if (interactive)
+            {
+                writer.Write("\r" + line + (done == total ? "\n" : ""));
+                writer.Flush();
+            }
+            else writer.WriteLine(line);
+        };
+    }
+
     public static async Task<int> RunAsync(Context ctx)
     {
         var area = ctx.Args.Get("--area");
-        if (string.IsNullOrWhiteSpace(area))
+        if (string.IsNullOrWhiteSpace(area) && ctx.Args.Get("--scope") != "repository")
             throw AdoException.Usage("--area is required (example: ado metrics --area Product\\ALPHA)");
         var format = ctx.Args.Get("--format") ?? (ctx.Json ? "json" : "html");
         if (format is not ("html" or "json"))
@@ -226,8 +263,39 @@ public static class DevelopmentMetrics
         if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var months) || months is < 1 or > 60)
             throw AdoException.Usage("--months must be between 1 and 60");
         var project = ctx.RequireProject();
-        var (matched, unlinked) = await CollectAsync(ctx.Client, project, area, months);
-        var report = Aggregate(project, area, months, DateTimeOffset.UtcNow, matched, unlinked);
+        var scope = ctx.Args.Get("--scope") ?? "area";
+        if (scope is not ("area" or "repository"))
+            throw AdoException.Usage("--scope must be area or repository");
+        Console.Error.WriteLine($"Metrics: project={project}, scope={scope}, months={months}");
+        List<PullRequest> matched;
+        int unlinked;
+        string displayedArea = area ?? "";
+        if (scope == "repository")
+        {
+            var repo = ctx.Args.Get("--repo") ?? ctx.Repo;
+            if (string.IsNullOrWhiteSpace(repo))
+                throw AdoException.Usage("--scope repository requires --repo <name> or a detected git repository");
+            Console.Error.WriteLine($"Fetching pull requests from repository {repo}...");
+            var all = await ctx.Client.GetPullRequestsAsync(project, repo, "all", null);
+            Console.Error.WriteLine($"Fetched {all.Count} pull requests.");
+            var cutoff = new DateTimeOffset(DateTimeOffset.UtcNow.Year, DateTimeOffset.UtcNow.Month,
+                1, 0, 0, 0, TimeSpan.Zero).AddMonths(1 - months);
+            matched = all.Where(p => IsCandidate(p, cutoff)).ToList();
+            unlinked = 0;
+            displayedArea = $"Repository: {repo} (not Area Path filtered)";
+        }
+        else
+        {
+            Console.Error.WriteLine($"Fetching project pull requests and matching linked work items in {area}...");
+            var selectedArea = area ?? throw AdoException.Usage("--area is required for area scope");
+            (matched, unlinked) = await CollectAsync(ctx.Client, project, selectedArea, months,
+                Progress(Console.Error, !Console.IsErrorRedirected));
+            if (matched.Count == 0)
+                Console.Error.WriteLine("Warning: " + NoMatchesMessage(selectedArea, unlinked));
+        }
+        Console.Error.WriteLine($"Matched {matched.Count} pull requests; unlinked candidates: {unlinked}. Calculating KPIs...");
+        var report = Aggregate(project, displayedArea, months, DateTimeOffset.UtcNow, matched, unlinked);
+        Console.Error.WriteLine($"Rendering {format.ToUpperInvariant()} report...");
         var output = format == "json" ? JsonSerializer.Serialize(report, Json.Options) + "\n" : Html(report);
         if (ctx.Args.Get("--output") is { } path)
         {

@@ -60,6 +60,13 @@ public static class DevelopmentMetrics
         return Math.Round(median, 1);
     }
 
+    /// <summary>Include PR activity in the window and old active PRs in the outstanding backlog.</summary>
+    public static bool IsCandidate(PullRequest pr, DateTimeOffset cutoff) =>
+        (pr.CreationDate is { } created && created >= cutoff) ||
+        (pr.ClosedDate is { } closed && closed >= cutoff) ||
+        (pr.ClosedDate is null && pr.CreationDate is { } older && older < cutoff &&
+            pr.Status.Equals("active", StringComparison.OrdinalIgnoreCase));
+
     /// <summary>Only explicitly linked work items with a matching Area Path qualify a PR.</summary>
     public static async Task<(List<PullRequest> Matched, int Unlinked)> CollectAsync(
         AdoClient client, string project, string area, int months)
@@ -68,11 +75,7 @@ public static class DevelopmentMetrics
         var cutoff = new DateTimeOffset(DateTimeOffset.UtcNow.Year, DateTimeOffset.UtcNow.Month, 1,
             0, 0, 0, TimeSpan.Zero).AddMonths(1 - months);
         // Include older PRs closed during the selected period as well.
-        var candidates = all.Where(p =>
-            (p.CreationDate is { } created && created >= cutoff) ||
-            (p.ClosedDate is { } closed && closed >= cutoff) ||
-            (p.ClosedDate is null && p.CreationDate is { } activeCreated && activeCreated < cutoff &&
-                p.Status.Equals("active", StringComparison.OrdinalIgnoreCase))).ToList();
+        var candidates = all.Where(p => IsCandidate(p, cutoff)).ToList();
         var matched = new List<PullRequest>();
         var unlinked = 0;
         foreach (var pr in candidates)

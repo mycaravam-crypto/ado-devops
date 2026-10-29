@@ -127,7 +127,7 @@ public static class TestPlanHtml
                         "Blocked" => (BlockedColor, "Blocked"),
                         _ => (NotRunColor, "Not run")
                     };
-                    sb.Append("<div class=\"case-status\" role=\"status\" style=\"--status-color:")
+                    sb.Append("<div class=\"case-status\" style=\"--status-color:")
                         .Append(color).Append("\"><span class=\"case-status-dot\" aria-hidden=\"true\"></span>")
                         .Append(label).Append("</div>");
                 }

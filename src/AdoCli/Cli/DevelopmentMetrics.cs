@@ -135,7 +135,9 @@ public static class DevelopmentMetrics
             .Append(E(report.Project)).Append(" · Area: ").Append(E(report.Area))
             .Append("</p><p class=\"muted\">Generated (UTC): ")
             .Append(report.GeneratedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture))
-            .Append(" · Last ").Append(report.Months).Append(" calendar months</p><div class=\"kpis\">");
+            .Append(" · Last ").Append(report.Months).Append(" calendar months</p>");
+        sb.Append(TopLineChart(report));
+        sb.Append("<div class=\"kpis\">");
         foreach (var (name, value) in new[] {
             ("PRs opened", report.Opened.ToString(CultureInfo.InvariantCulture)),
             ("PRs closed", report.Closed.ToString(CultureInfo.InvariantCulture)),
@@ -164,6 +166,95 @@ public static class DevelopmentMetrics
             .Append("Opened and closed are separate monthly event counts, not a cohort conversion rate. ")
             .Append("Closed includes completed and abandoned PRs; average duration uses closure minus creation time and excludes records without valid dates. ")
             .Append("Missing or unlinked work items can cause undercounting. Times are UTC.</p></main></body></html>");
+        return sb.ToString();
+    }
+
+    /// <summary>Offline SVG trend above KPIs; switches units instead of mixing counts and days.</summary>
+    public static string TopLineChart(Report report)
+    {
+        static string Points(IReadOnlyList<Month> months, Func<Month, double?> selector)
+        {
+            var values = months.Select(selector).ToArray();
+            var maximum = Math.Max(1, values.Where(v => v.HasValue).Select(v => v!.Value).DefaultIfEmpty().Max());
+            var span = Math.Max(1, values.Length - 1);
+            return string.Join(" ", values.Select((v, i) => v is null ? null :
+                $"{(40 + i * 680.0 / span).ToString("0.##", CultureInfo.InvariantCulture)},{(170 - v.Value * 135 / maximum).ToString("0.##", CultureInfo.InvariantCulture)}")
+                .Where(v => v is not null));
+        }
+        var sb = new StringBuilder("""
+            <section class="top-trend" aria-labelledby="top-trend-heading">
+            <div class="top-trend-heading"><h2 id="top-trend-heading">KPI development</h2>
+            <div class="top-trend-controls" role="group" aria-label="Choose trend KPI">
+            <button type="button" class="trend-choice" data-series="opened" aria-pressed="true">Opened</button>
+            <button type="button" class="trend-choice" data-series="closed" aria-pressed="false">Closed</button>
+            <button type="button" class="trend-choice" data-series="duration" aria-pressed="false">Average days</button>
+            </div></div>
+            <svg class="top-trend-plot" viewBox="0 0 760 210" role="img" aria-label="Monthly KPI trend; detailed values in the table below">
+            <line x1="40" y1="170" x2="720" y2="170" stroke="currentColor" opacity=".28"/>
+            <line x1="40" y1="102.5" x2="720" y2="102.5" stroke="currentColor" opacity=".12"/>
+            <line x1="40" y1="35" x2="720" y2="35" stroke="currentColor" opacity=".12"/>
+            """);
+        foreach (var (key, selector, color) in new (string Key, Func<Month, double?> Selector, string Color)[]
+        {
+            ("opened", m => m.Opened, "var(--accent)"),
+            ("closed", m => m.Closed, "var(--accent2)"),
+            ("duration", m => m.AverageDays, "var(--accent)")
+        })
+        {
+            sb.Append("<g class=\"trend-series\" data-series=\"").Append(key).Append("\"");
+            if (key != "opened") sb.Append(" hidden");
+            sb.Append("><polyline fill=\"none\" stroke=\"").Append(color)
+                .Append("\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\" points=\"")
+                .Append(Points(report.Timeline, selector)).Append("\"/>");
+            var maximum = Math.Max(1, report.Timeline.Select(selector).Where(v => v.HasValue).Select(v => v!.Value).DefaultIfEmpty().Max());
+            var span = Math.Max(1, report.Timeline.Count - 1);
+            for (var i = 0; i < report.Timeline.Count; i++)
+            {
+                var month = report.Timeline[i];
+                var value = selector(month);
+                if (!value.HasValue) continue;
+                var x = (40 + i * 680.0 / span).ToString("0.##", CultureInfo.InvariantCulture);
+                var y = (170 - value.Value * 135 / maximum).ToString("0.##", CultureInfo.InvariantCulture);
+                sb.Append("<circle cx=\"").Append(x).Append("\" cy=\"").Append(y)
+                    .Append("\" r=\"4\" fill=\"").Append(color).Append("\"><title>")
+                    .Append(month.Period).Append(": ").Append(value.Value.ToString("0.#", CultureInfo.InvariantCulture))
+                    .Append(key == "duration" ? " days" : " PRs").Append("</title></circle>");
+            }
+            sb.Append("</g>");
+        }
+        if (report.Timeline.Count > 0)
+        {
+            sb.Append("<text x=\"40\" y=\"200\" font-size=\"12\" fill=\"currentColor\">")
+                .Append(report.Timeline[0].Period).Append("</text><text x=\"720\" y=\"200\" font-size=\"12\" fill=\"currentColor\" text-anchor=\"end\">")
+                .Append(report.Timeline[^1].Period).Append("</text>");
+        }
+        sb.Append("""
+            </svg><p class="muted">Monthly UTC trend · select a metric to compare months. Exact values are listed below.</p>
+            </section>
+            <style>
+            .top-trend{margin:24px 0;padding:20px;border:1px solid var(--line);border-radius:10px}
+            .top-trend-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+            .top-trend-heading h2{margin:0}.top-trend-controls{display:flex;gap:6px;flex-wrap:wrap}
+            .trend-choice{font:inherit;font-size:13px;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:6px;padding:6px 10px}
+            .trend-choice[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);font-weight:700}
+            .trend-choice:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+            .top-trend-plot{display:block;width:100%;height:auto;max-height:310px;margin-top:16px;overflow:visible}
+            .trend-series[hidden]{display:none}
+            </style>
+            <script>
+            (() => {
+              const section = document.querySelector('.top-trend');
+              if (!section) return;
+              const buttons = [...section.querySelectorAll('.trend-choice')];
+              const groups = [...section.querySelectorAll('.trend-series')];
+              buttons.forEach(button => button.addEventListener('click', () => {
+                const selected = button.dataset.series;
+                buttons.forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+                groups.forEach(group => group.hidden = group.dataset.series !== selected);
+              }));
+            })();
+            </script>
+            """);
         return sb.ToString();
     }
 

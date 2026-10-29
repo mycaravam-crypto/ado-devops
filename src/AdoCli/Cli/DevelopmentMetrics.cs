@@ -89,6 +89,13 @@ public static class DevelopmentMetrics
         return (matched, unlinked);
     }
 
+    /// <summary>Report why Area Path matching did not find linked PRs.</summary>
+    public static string NoMatchesMessage(string area, int unlinked) =>
+        $"No pull requests were matched to Area Path '{area}'. " +
+        $"{unlinked} candidate PR(s) have no linked work items. " +
+        "Azure DevOps PRs have no Area Path of their own. Link PRs to work items in this area " +
+        "or use --scope repository --repo <name> for repository-wide metrics (not Area Path metrics).";
+
     public static string Html(Report report)
     {
         static string E(string? value) => WebUtility.HtmlEncode(value ?? "");
@@ -226,8 +233,31 @@ public static class DevelopmentMetrics
         if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var months) || months is < 1 or > 60)
             throw AdoException.Usage("--months must be between 1 and 60");
         var project = ctx.RequireProject();
-        var (matched, unlinked) = await CollectAsync(ctx.Client, project, area, months);
-        var report = Aggregate(project, area, months, DateTimeOffset.UtcNow, matched, unlinked);
+        var scope = ctx.Args.Get("--scope") ?? "area";
+        if (scope is not ("area" or "repository"))
+            throw AdoException.Usage("--scope must be area or repository");
+        List<PullRequest> matched;
+        int unlinked;
+        string displayedArea = area ?? "";
+        if (scope == "repository")
+        {
+            var repo = ctx.Args.Get("--repo") ?? ctx.Repo;
+            if (string.IsNullOrWhiteSpace(repo))
+                throw AdoException.Usage("--scope repository requires --repo <name> or a detected git repository");
+            var all = await ctx.Client.GetPullRequestsAsync(project, repo, "all", null);
+            var cutoff = new DateTimeOffset(DateTimeOffset.UtcNow.Year, DateTimeOffset.UtcNow.Month,
+                1, 0, 0, 0, TimeSpan.Zero).AddMonths(1 - months);
+            matched = all.Where(p => IsCandidate(p, cutoff)).ToList();
+            unlinked = 0;
+            displayedArea = $"Repository: {repo} (not Area Path filtered)";
+        }
+        else
+        {
+            (matched, unlinked) = await CollectAsync(ctx.Client, project, area, months);
+            if (matched.Count == 0)
+                Console.Error.WriteLine("Warning: " + NoMatchesMessage(area, unlinked));
+        }
+        var report = Aggregate(project, displayedArea, months, DateTimeOffset.UtcNow, matched, unlinked);
         var output = format == "json" ? JsonSerializer.Serialize(report, Json.Options) + "\n" : Html(report);
         if (ctx.Args.Get("--output") is { } path)
         {

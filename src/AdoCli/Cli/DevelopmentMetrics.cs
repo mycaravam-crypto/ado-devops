@@ -188,8 +188,28 @@ public static class DevelopmentMetrics
             .Append("Unlinked PRs among the date-range candidates: ").Append(report.UnlinkedPullRequests).Append(". ")
             .Append("Opened and closed are separate monthly event counts, not a cohort conversion rate. ")
             .Append("Closed includes completed and abandoned PRs; average duration uses closure minus creation time and excludes records without valid dates. ")
-            .Append("Missing or unlinked work items can cause undercounting. Times are UTC.</p></main></body></html>");
+            .Append("Missing or unlinked work items can cause undercounting. Times are UTC.</p>");
+        sb.Append(PrInventoryHtml(report));
+        sb.Append("</main></body></html>");
         return sb.ToString();
+    }
+
+    /// <summary>Escaped, complete inventory of the PRs included in the selected scope and period.</summary>
+    public static string PrInventoryHtml(Report report)
+    {
+        static string E(string? v) => WebUtility.HtmlEncode(v ?? "");
+        var sb = new StringBuilder();
+        sb.Append("<section id=\"pr-inventory\"><h2>Pull requests in scope</h2>")
+            .Append("<p class=\"muted\">Includes matching PRs opened or closed during the period, plus older PRs still active. ")
+            .Append("Commit counts represent commits associated with each PR; missing counts are excluded from the average. ")
+            .Append("Unavailable commit counts: ").Append(report.CommitCountUnavailable).Append(".</p>")
+            .Append("<div class=\"scroll\"><table><thead><tr><th>PR ID</th><th>Title</th><th>Created by</th>")
+            .Append("<th>Source branch</th><th>Target branch</th></tr></thead><tbody>");
+        foreach (var pr in report.PullRequests ?? [])
+            sb.Append("<tr><td>").Append(pr.PrId).Append("</td><td>").Append(E(pr.Title))
+                .Append("</td><td>").Append(E(pr.CreatedBy)).Append("</td><td>")
+                .Append(E(pr.SourceBranch)).Append("</td><td>").Append(E(pr.TargetBranch)).Append("</td></tr>");
+        return sb.Append("</tbody></table></div></section>").ToString();
     }
 
     /// <summary>Offline SVG trend above KPIs; switches units instead of mixing counts and days.</summary>
@@ -434,6 +454,22 @@ public static class DevelopmentMetrics
         }
         Console.Error.WriteLine($"Matched {matched.Count} pull requests; unlinked candidates: {unlinked}. Calculating KPIs...");
         var report = Aggregate(project, displayedArea, months, DateTimeOffset.UtcNow, matched, unlinked);
+        Console.Error.WriteLine($"Fetching commit counts for {matched.Count} PRs...");
+        var inventory = new List<PrDetail>();
+        var commitErrors = 0;
+        for (var i = 0; i < matched.Count; i++)
+        {
+            var pr = matched[i];
+            int? commitCount;
+            try { commitCount = (await ctx.Client.GetPullRequestCommitsAsync(pr)).Count; }
+            catch (AdoException) { commitCount = null; commitErrors++; }
+            inventory.Add(Detail(pr, commitCount));
+            if ((i + 1) % 25 == 0 || i + 1 == matched.Count)
+                Console.Error.WriteLine($"Commit counts: {i + 1}/{matched.Count} PRs checked");
+        }
+        if (commitErrors > 0)
+            Console.Error.WriteLine($"Warning: commit counts unavailable for {commitErrors} PRs.");
+        report = WithPullRequests(report, inventory);
         Console.Error.WriteLine($"Rendering {format.ToUpperInvariant()} report...");
         var output = format == "json" ? JsonSerializer.Serialize(report, Json.Options) + "\n" : Html(report);
         if (ctx.Args.Get("--output") is { } path)

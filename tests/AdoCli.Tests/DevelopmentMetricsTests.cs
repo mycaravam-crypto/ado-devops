@@ -258,4 +258,19 @@ public sealed class DevelopmentMetricsTests
         Assert.DoesNotContain("Charlie", html);
     }
 
+    [Fact]
+    public void PrInventoryIncludesDocWizzStyleTableControls()
+    {
+        var report = DevelopmentMetrics.Aggregate("Project", "Area", 1,
+            new DateTimeOffset(2026, 10, 29, 0, 0, 0, TimeSpan.Zero), [], 0);
+        var html = DevelopmentMetrics.PrInventoryHtml(report);
+        Assert.Contains("id=\"pr-table-filter\"", html);
+        Assert.Contains("id=\"pr-table-size\"", html);
+        Assert.Contains("id=\"pr-table-prev\"", html);
+        Assert.Contains("id=\"pr-table-next\"", html);
+        Assert.Contains("aria-sort", html);
+        Assert.Contains("sortColumn === 0", html);
+        Assert.Contains("filter.addEventListener('input'", html);
+    }
+
 }

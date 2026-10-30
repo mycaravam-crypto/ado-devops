@@ -235,4 +235,27 @@ public sealed class DevelopmentMetricsTests
         Assert.Equal(1, enriched.CommitCountUnavailable);
     }
 
+    [Fact]
+    public void InventoryDisplaysApproversAndClosureIdentity()
+    {
+        var pr = Pr(42, new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 10, 2, 0, 0, 0, TimeSpan.Zero)) with
+        {
+            Reviewers = [new Reviewer("Alice", 10), new Reviewer("Bob", 5), new Reviewer("Charlie", -10)],
+            ClosedBy = new IdentityRef("Release Manager")
+        };
+        var detail = DevelopmentMetrics.Detail(pr, 3);
+        Assert.Equal("Alice, Bob", detail.ApprovedBy);
+        Assert.Equal("Release Manager", detail.ClosedBy);
+        var report = DevelopmentMetrics.WithPullRequests(
+            DevelopmentMetrics.Aggregate("Project", "Area", 1,
+                new DateTimeOffset(2026, 10, 29, 0, 0, 0, TimeSpan.Zero), [pr], 0), [detail]);
+        var html = DevelopmentMetrics.PrInventoryHtml(report);
+        Assert.Contains("Approved by", html);
+        Assert.Contains("Closed by", html);
+        Assert.Contains("Alice, Bob", html);
+        Assert.Contains("Release Manager", html);
+        Assert.DoesNotContain("Charlie", html);
+    }
+
 }

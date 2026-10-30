@@ -273,4 +273,19 @@ public sealed class DevelopmentMetricsTests
         Assert.Contains("filter.addEventListener('input'", html);
     }
 
+    [Fact]
+    public void DashboardRendersAreaTestCoverageSnapshot()
+    {
+        var report = DevelopmentMetrics.Aggregate("Project", "Area", 1,
+            new DateTimeOffset(2026, 10, 29, 0, 0, 0, TimeSpan.Zero), [], 0)
+            with { Tests = new DevelopmentMetrics.TestMetrics(10, 3, 7, 24, 4, 2) };
+        var html = DevelopmentMetrics.Html(report);
+        Assert.Contains("Tests &amp; coverage", html);
+        Assert.Contains("Stories without test cases", html);
+        Assert.Contains("Test cases outside plans", html);
+        Assert.Contains("test links and plan assignments are not limited", html);
+        Assert.True(html.IndexOf("Tests &amp; coverage", StringComparison.Ordinal) <
+            html.IndexOf("Monthly pull requests", StringComparison.Ordinal));
+    }
+
 }

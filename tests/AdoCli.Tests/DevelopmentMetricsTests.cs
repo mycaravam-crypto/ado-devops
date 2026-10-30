@@ -288,4 +288,21 @@ public sealed class DevelopmentMetricsTests
             html.IndexOf("Monthly pull requests", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void LinkedTestCasesAreDetectedWithoutCheckingTheirAreaPath()
+    {
+        var story = new WorkItem(100, []) {
+            Relations = [
+                new WorkItemRelation("Microsoft.VSTS.Common.TestedBy-Forward",
+                    "https://dev.azure.com/example/_apis/wit/workItems/601"),
+                new WorkItemRelation("Microsoft.VSTS.Common.TestedBy-Reverse",
+                    "https://dev.azure.com/example/_apis/wit/workItems/602"),
+                new WorkItemRelation("System.LinkTypes.Hierarchy-Forward",
+                    "https://dev.azure.com/example/_apis/wit/workItems/999")
+            ]
+        };
+        Assert.Equal([601, 602], DevelopmentMetrics.LinkedTestCaseIds(story).Order().ToArray());
+        Assert.Empty(DevelopmentMetrics.LinkedTestCaseIds(new WorkItem(101, [])));
+    }
+
 }

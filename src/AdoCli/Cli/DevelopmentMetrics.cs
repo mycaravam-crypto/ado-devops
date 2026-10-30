@@ -52,19 +52,28 @@ public static class DevelopmentMetrics
         {
             Everyone = true, Area = area, States = ["any"], Types = ["User Story"]
         })).Distinct().ToList();
-        var testIds = (await client.QueryWorkItemIdsAsync(project, new WorkItemFilter
+        // Test Cases commonly live in a separate QA area. Count tested-by links from
+        // stories in the selected area regardless of the Test Case's own Area Path.
+        var areaCaseIds = (await client.QueryWorkItemIdsAsync(project, new WorkItemFilter
         {
             Everyone = true, Area = area, States = ["any"], Types = ["Test Case"]
         })).ToHashSet();
-        progress?.Invoke($"Found {storyIds.Count} user stories and {testIds.Count} test cases in {area}.");
+        var linkedCaseIds = new HashSet<int>();
         var uncovered = 0;
         foreach (var id in storyIds)
         {
             var story = await client.GetWorkItemWithRelationsAsync(id);
-            if (!(story.Relations ?? []).Any(r => TestPlanCoverage.IsTestLink(r)
-                && TestPlanCoverage.LinkedId(r.Url) is { } caseId && testIds.Contains(caseId)))
-                uncovered++;
+            var linked = (story.Relations ?? [])
+                .Where(TestPlanCoverage.IsTestLink)
+                .Select(r => TestPlanCoverage.LinkedId(r.Url))
+                .OfType<int>().ToHashSet();
+            if (linked.Count == 0) uncovered++;
+            linkedCaseIds.UnionWith(linked);
         }
+        var testIds = areaCaseIds.Union(linkedCaseIds).ToHashSet();
+        progress?.Invoke($"Found {storyIds.Count} user stories, {areaCaseIds.Count} test cases inside area, " +
+            $"{linkedCaseIds.Count} test cases linked from stories (including other areas), " +
+            $"{uncovered} stories without Tested By links.");
         var plans = await client.GetTestPlansAsync(project);
         var matchingPlans = 0;
         var assignedCases = new HashSet<int>();

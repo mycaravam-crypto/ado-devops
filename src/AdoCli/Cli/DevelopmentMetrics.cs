@@ -10,10 +10,13 @@ using AdoCli.Api;
 public static class DevelopmentMetrics
 {
     public sealed record Month(string Period, int Opened, int Closed, double? AverageDays);
+    public sealed record PrDetail(int PrId, string Title, string CreatedBy, string SourceBranch, string TargetBranch, int? Commits);
     public sealed record Report(string Format, string Project, string Area, DateTimeOffset GeneratedAt,
         int Months, int MatchedPullRequests, int UnlinkedPullRequests, int Opened, int Closed,
         double? AverageDays, IReadOnlyList<Month> Timeline,
-        int Merged = 0, int Abandoned = 0, int OpenAtEnd = 0, double? MedianDays = null);
+        int Merged = 0, int Abandoned = 0, int OpenAtEnd = 0, double? MedianDays = null,
+        int Commits = 0, double? AverageCommitsPerPr = null, int CommitCountUnavailable = 0,
+        IReadOnlyList<PrDetail>? PullRequests = null);
 
     public static Report Aggregate(string project, string area, int months, DateTimeOffset generatedAt,
         IEnumerable<PullRequest> matched, int unlinked)
@@ -38,6 +41,24 @@ public static class DevelopmentMetrics
             prs.Count(p => p.CreationDate is { } created && created < end &&
                 (p.ClosedDate is null || p.ClosedDate >= end)), MedianDays(observedClosed));
     }
+
+    /// <summary>Attach PR inventory and total commit count; unavailable counts are excluded from the average.</summary>
+    public static Report WithPullRequests(Report report, IReadOnlyList<PrDetail> details)
+    {
+        var available = details.Where(p => p.Commits.HasValue).ToList();
+        var total = available.Sum(p => p.Commits!.Value);
+        return report with
+        {
+            PullRequests = details,
+            Commits = total,
+            AverageCommitsPerPr = available.Count == 0 ? null :
+                Math.Round((double)total / available.Count, 1),
+            CommitCountUnavailable = details.Count - available.Count
+        };
+    }
+
+    public static PrDetail Detail(PullRequest pr, int? commits) =>
+        new(pr.PullRequestId, pr.Title, pr.CreatedBy.DisplayName, pr.SourceRefName, pr.TargetRefName, commits);
 
     public static double? AverageDays(IEnumerable<PullRequest> prs)
     {
@@ -146,7 +167,9 @@ public static class DevelopmentMetrics
             ("Merged PRs", report.Merged.ToString(CultureInfo.InvariantCulture)),
             ("Abandoned PRs", report.Abandoned.ToString(CultureInfo.InvariantCulture)),
             ("Open at period end", report.OpenAtEnd.ToString(CultureInfo.InvariantCulture)),
-            ("PRs in selected area", report.MatchedPullRequests.ToString(CultureInfo.InvariantCulture))
+            ("PRs in selected area", report.MatchedPullRequests.ToString(CultureInfo.InvariantCulture)),
+            ("Commits", report.Commits.ToString(CultureInfo.InvariantCulture)),
+            ("Avg commits/PR", V(report.AverageCommitsPerPr))
         })
             sb.Append("<div class=\"kpi\"><strong>").Append(E(value)).Append("</strong><span>").Append(E(name)).Append("</span></div>");
         sb.Append("</div><h2>Monthly pull requests</h2><div class=\"legend\"><span><i class=\"swatch opened\"></i>Opened</span><span><i class=\"swatch closed\"></i>Closed</span></div>")

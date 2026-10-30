@@ -206,7 +206,18 @@ public static class DevelopmentMetrics
             .Append("<p class=\"muted\">Includes matching PRs opened or closed during the period, plus older PRs still active. ")
             .Append("Commit counts represent commits associated with each PR; missing counts are excluded from the average. ")
             .Append("Unavailable commit counts: ").Append(report.CommitCountUnavailable).Append(".</p>")
-            .Append("<div class=\"scroll\"><table><thead><tr><th>PR ID</th><th>Title</th><th>Created by</th>")
+            .Append("""
+                <div class="pr-table-tools">
+                  <label for="pr-table-filter">Filter table</label>
+                  <input id="pr-table-filter" type="search" placeholder="Search PRs…" autocomplete="off">
+                  <span id="pr-table-count" aria-live="polite"></span>
+                  <label>Rows <select id="pr-table-size"><option>25</option><option>50</option><option>100</option></select></label>
+                  <button type="button" id="pr-table-prev">Previous</button>
+                  <span id="pr-table-page"></span>
+                  <button type="button" id="pr-table-next">Next</button>
+                </div>
+                """)
+            .Append("<div class=\"scroll\"><table id=\"pr-table\"><thead><tr><th>PR ID</th><th>Title</th><th>Created by</th>")
             .Append("<th>Source branch</th><th>Target branch</th><th>Approved by</th><th>Closed by</th></tr></thead><tbody>");
         foreach (var pr in report.PullRequests ?? [])
             sb.Append("<tr><td>").Append(pr.PrId).Append("</td><td>").Append(E(pr.Title))
@@ -215,7 +226,75 @@ public static class DevelopmentMetrics
                 .Append("</td><td>").Append(E(string.IsNullOrEmpty(pr.ApprovedBy) ? "—" : pr.ApprovedBy))
                 .Append("</td><td>").Append(E(string.IsNullOrEmpty(pr.ClosedBy) ? "—" : pr.ClosedBy))
                 .Append("</td></tr>");
-        return sb.Append("</tbody></table></div></section>").ToString();
+        return sb.Append("""
+            </tbody></table></div></section>
+            <style>
+            .pr-table-tools{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:16px 0;font-size:13px}
+            .pr-table-tools input{flex:1 1 180px;min-width:120px;padding:7px;border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:7px}
+            .pr-table-tools select,.pr-table-tools button{font:inherit;padding:6px 9px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--text)}
+            .pr-table-tools button:not(:disabled){cursor:pointer}
+            .pr-table-tools button:disabled{opacity:.45}
+            #pr-table th button{font:inherit;font-weight:600;color:inherit;border:0;background:none;cursor:pointer;text-align:left;padding:0}
+            #pr-table th button:focus-visible,.pr-table-tools :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+            #pr-table tbody tr[hidden]{display:none}
+            </style>
+            <script>
+            (() => {
+              const table = document.getElementById('pr-table');
+              if (!table) return;
+              const rows = [...table.tBodies[0].rows];
+              const filter = document.getElementById('pr-table-filter');
+              const size = document.getElementById('pr-table-size');
+              const count = document.getElementById('pr-table-count');
+              const previous = document.getElementById('pr-table-prev');
+              const next = document.getElementById('pr-table-next');
+              const pageLabel = document.getElementById('pr-table-page');
+              let page = 0, sortColumn = -1, descending = false;
+              const headers = [...table.tHead.rows[0].cells];
+              headers.forEach((th, column) => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.textContent = th.textContent;
+                th.replaceChildren(button);
+                button.addEventListener('click', () => {
+                  descending = sortColumn === column ? !descending : false;
+                  sortColumn = column; page = 0; update();
+                });
+              });
+              function update() {
+                const query = filter.value.trim().toLowerCase();
+                const filtered = rows.filter(row => row.textContent.toLowerCase().includes(query));
+                if (sortColumn >= 0) {
+                  filtered.sort((a, b) => {
+                    const left = a.cells[sortColumn].textContent.trim();
+                    const right = b.cells[sortColumn].textContent.trim();
+                    const result = sortColumn === 0
+                      ? Number(left) - Number(right)
+                      : left.localeCompare(right, undefined, {numeric: true, sensitivity: 'base'});
+                    return descending ? -result : result;
+                  });
+                }
+                const perPage = Number(size.value);
+                const pages = Math.max(1, Math.ceil(filtered.length / perPage));
+                page = Math.min(page, pages - 1);
+                rows.forEach(row => { row.hidden = true; });
+                const visible = filtered.slice(page * perPage, (page + 1) * perPage);
+                visible.forEach(row => { row.hidden = false; table.tBodies[0].appendChild(row); });
+                count.textContent = filtered.length + ' / ' + rows.length + ' PRs';
+                pageLabel.textContent = (page + 1) + ' / ' + pages;
+                previous.disabled = page === 0;
+                next.disabled = page >= pages - 1;
+                headers.forEach((th, i) => th.setAttribute('aria-sort',
+                  i === sortColumn ? (descending ? 'descending' : 'ascending') : 'none'));
+              }
+              filter.addEventListener('input', () => { page = 0; update(); });
+              size.addEventListener('change', () => { page = 0; update(); });
+              previous.addEventListener('click', () => { if (page > 0) { page--; update(); } });
+              next.addEventListener('click', () => { page++; update(); });
+              update();
+            })();
+            </script>
+            """).ToString();
     }
 
     /// <summary>Offline SVG trend above KPIs; switches units instead of mixing counts and days.</summary>

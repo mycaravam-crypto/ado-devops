@@ -227,14 +227,14 @@ public static class DevelopmentMetrics
         {
             var month = report.Timeline[i];
             var date = DateTime.ParseExact(month.Period, "yyyy-MM", CultureInfo.InvariantCulture);
-            var label = date.ToString("MMM", CultureInfo.GetCultureInfo("en-US"));
+            var label = new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }[date.Month - 1];
             if (date.Month == 1 || i == 0) label += " " + date.Year.ToString(CultureInfo.InvariantCulture);
             var x = (40 + i * 680.0 / labelSpan).ToString("0.##", CultureInfo.InvariantCulture);
             sb.Append("<text x=\"").Append(x).Append("\" y=\"200\" font-size=\"11\" text-anchor=\"middle\" fill=\"currentColor\">")
                 .Append(label).Append("</text>");
         }
         sb.Append("""
-            </svg><p class="muted">Monthly UTC trend · select a metric to compare months. Exact values are listed below.</p>
+            </svg><p class="muted" id="top-trend-status" aria-live="polite">Opened PRs · monthly values</p><p class="muted">Monthly UTC trend · select a metric to compare months. Exact values are listed below.</p>
             </section>
             <style>
             .top-trend{margin:24px 0;padding:20px;border:1px solid var(--line);border-radius:10px}
@@ -259,6 +259,12 @@ public static class DevelopmentMetrics
                   if (group.dataset.series === selected) group.removeAttribute("hidden");
                   else group.setAttribute("hidden", "");
                 });
+                const current = groups.find(group => group.dataset.series === selected);
+                const labels = {opened: 'Opened PRs', closed: 'Closed PRs', duration: 'Average days to close'};
+                const status = section.querySelector('#top-trend-status');
+                if (status) status.textContent = (labels[selected] || selected) +
+                  (current && current.querySelectorAll('circle').length > 0
+                    ? ' · monthly values' : ' · no data for this period');
               }));
             })();
             </script>

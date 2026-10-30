@@ -174,4 +174,16 @@ public sealed class DevelopmentMetricsTests
         Assert.Contains("data-series=\"closed\"", html);
     }
 
+    [Fact]
+    public void MonthLabelsDoNotRequireNamedCultures()
+    {
+        var report = DevelopmentMetrics.Aggregate("Project", "Area", 12,
+            new DateTimeOffset(2026, 10, 29, 0, 0, 0, TimeSpan.Zero), [], 0);
+        var html = DevelopmentMetrics.TopLineChart(report);
+        Assert.Contains(">Nov 2025</text>", html);
+        Assert.Contains(">Jan 2026</text>", html);
+        Assert.Contains(">Oct</text>", html);
+        Assert.DoesNotContain("en-US", html);
+    }
+
 }

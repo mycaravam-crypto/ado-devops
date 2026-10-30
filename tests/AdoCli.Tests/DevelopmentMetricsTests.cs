@@ -198,4 +198,41 @@ public sealed class DevelopmentMetricsTests
         Assert.Contains("querySelectorAll('circle')", html);
     }
 
+    [Fact]
+    public void CommitMetricsExcludeUnavailableCountsAndKeepEntirePrInventory()
+    {
+        var report = DevelopmentMetrics.Aggregate("Project", "Area", 1,
+            new DateTimeOffset(2026, 10, 29, 0, 0, 0, TimeSpan.Zero), [], 0);
+        var details = new[]
+        {
+            new DevelopmentMetrics.PrDetail(12, "<Unsafe>", "Alice", "refs/heads/f1", "refs/heads/main", 4),
+            new DevelopmentMetrics.PrDetail(13, "Fix", "Bob", "refs/heads/f2", "refs/heads/main", 2),
+            new DevelopmentMetrics.PrDetail(14, "Change", "Carol", "refs/heads/f3", "refs/heads/main", null)
+        };
+        var enriched = DevelopmentMetrics.WithPullRequests(report, details);
+        Assert.Equal(6, enriched.Commits);
+        Assert.Equal(3, enriched.AverageCommitsPerPr);
+        Assert.Equal(1, enriched.CommitCountUnavailable);
+        Assert.Equal(3, enriched.PullRequests!.Count);
+        var html = DevelopmentMetrics.Html(enriched);
+        Assert.Contains("Avg commits/PR", html);
+        Assert.Contains("Commits", html);
+        Assert.Contains("&lt;Unsafe&gt;", html);
+        Assert.DoesNotContain("<Unsafe>", html);
+        Assert.Contains("refs/heads/f1", html);
+        Assert.True(html.IndexOf("id=\"pr-inventory\"", StringComparison.Ordinal) >
+                    html.IndexOf("Scope and definitions", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CommitAverageIsNotReportedWhenAllCountsAreUnavailable()
+    {
+        var report = DevelopmentMetrics.Aggregate("Project", "Area", 1,
+            new DateTimeOffset(2026, 10, 29, 0, 0, 0, TimeSpan.Zero), [], 0);
+        var enriched = DevelopmentMetrics.WithPullRequests(report,
+            [new DevelopmentMetrics.PrDetail(42, "PR", "Alice", "branch", "main", null)]);
+        Assert.Null(enriched.AverageCommitsPerPr);
+        Assert.Equal(1, enriched.CommitCountUnavailable);
+    }
+
 }

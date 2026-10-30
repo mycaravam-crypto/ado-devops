@@ -10,10 +10,13 @@ using AdoCli.Api;
 public static class DevelopmentMetrics
 {
     public sealed record Month(string Period, int Opened, int Closed, double? AverageDays);
+    public sealed record PrDetail(int PrId, string Title, string CreatedBy, string SourceBranch, string TargetBranch, int? Commits, string ApprovedBy = "", string ClosedBy = "");
     public sealed record Report(string Format, string Project, string Area, DateTimeOffset GeneratedAt,
         int Months, int MatchedPullRequests, int UnlinkedPullRequests, int Opened, int Closed,
         double? AverageDays, IReadOnlyList<Month> Timeline,
-        int Merged = 0, int Abandoned = 0, int OpenAtEnd = 0, double? MedianDays = null);
+        int Merged = 0, int Abandoned = 0, int OpenAtEnd = 0, double? MedianDays = null,
+        int Commits = 0, double? AverageCommitsPerPr = null, int CommitCountUnavailable = 0,
+        IReadOnlyList<PrDetail>? PullRequests = null);
 
     public static Report Aggregate(string project, string area, int months, DateTimeOffset generatedAt,
         IEnumerable<PullRequest> matched, int unlinked)
@@ -38,6 +41,27 @@ public static class DevelopmentMetrics
             prs.Count(p => p.CreationDate is { } created && created < end &&
                 (p.ClosedDate is null || p.ClosedDate >= end)), MedianDays(observedClosed));
     }
+
+    /// <summary>Attach PR inventory and total commit count; unavailable counts are excluded from the average.</summary>
+    public static Report WithPullRequests(Report report, IReadOnlyList<PrDetail> details)
+    {
+        var available = details.Where(p => p.Commits.HasValue).ToList();
+        var total = available.Sum(p => p.Commits!.Value);
+        return report with
+        {
+            PullRequests = details,
+            Commits = total,
+            AverageCommitsPerPr = available.Count == 0 ? null :
+                Math.Round((double)total / available.Count, 1),
+            CommitCountUnavailable = details.Count - available.Count
+        };
+    }
+
+    public static PrDetail Detail(PullRequest pr, int? commits) =>
+        new(pr.PullRequestId, pr.Title, pr.CreatedBy.DisplayName, pr.SourceRefName, pr.TargetRefName, commits,
+            string.Join(", ", (pr.Reviewers ?? []).Where(r => r.Vote is 10 or 5)
+                .Select(r => r.DisplayName).Distinct(StringComparer.OrdinalIgnoreCase)),
+            pr.ClosedBy?.DisplayName ?? "");
 
     public static double? AverageDays(IEnumerable<PullRequest> prs)
     {
@@ -146,7 +170,9 @@ public static class DevelopmentMetrics
             ("Merged PRs", report.Merged.ToString(CultureInfo.InvariantCulture)),
             ("Abandoned PRs", report.Abandoned.ToString(CultureInfo.InvariantCulture)),
             ("Open at period end", report.OpenAtEnd.ToString(CultureInfo.InvariantCulture)),
-            ("PRs in selected area", report.MatchedPullRequests.ToString(CultureInfo.InvariantCulture))
+            ("PRs in selected area", report.MatchedPullRequests.ToString(CultureInfo.InvariantCulture)),
+            ("Commits", report.Commits.ToString(CultureInfo.InvariantCulture)),
+            ("Avg commits/PR", V(report.AverageCommitsPerPr))
         })
             sb.Append("<div class=\"kpi\"><strong>").Append(E(value)).Append("</strong><span>").Append(E(name)).Append("</span></div>");
         sb.Append("</div><h2>Monthly pull requests</h2><div class=\"legend\"><span><i class=\"swatch opened\"></i>Opened</span><span><i class=\"swatch closed\"></i>Closed</span></div>")
@@ -165,8 +191,31 @@ public static class DevelopmentMetrics
             .Append("Unlinked PRs among the date-range candidates: ").Append(report.UnlinkedPullRequests).Append(". ")
             .Append("Opened and closed are separate monthly event counts, not a cohort conversion rate. ")
             .Append("Closed includes completed and abandoned PRs; average duration uses closure minus creation time and excludes records without valid dates. ")
-            .Append("Missing or unlinked work items can cause undercounting. Times are UTC.</p></main></body></html>");
+            .Append("Missing or unlinked work items can cause undercounting. Times are UTC.</p>");
+        sb.Append(PrInventoryHtml(report));
+        sb.Append("</main></body></html>");
         return sb.ToString();
+    }
+
+    /// <summary>Escaped, complete inventory of the PRs included in the selected scope and period.</summary>
+    public static string PrInventoryHtml(Report report)
+    {
+        static string E(string? v) => WebUtility.HtmlEncode(v ?? "");
+        var sb = new StringBuilder();
+        sb.Append("<section id=\"pr-inventory\"><h2>Pull requests in scope</h2>")
+            .Append("<p class=\"muted\">Includes matching PRs opened or closed during the period, plus older PRs still active. ")
+            .Append("Commit counts represent commits associated with each PR; missing counts are excluded from the average. ")
+            .Append("Unavailable commit counts: ").Append(report.CommitCountUnavailable).Append(".</p>")
+            .Append("<div class=\"scroll\"><table><thead><tr><th>PR ID</th><th>Title</th><th>Created by</th>")
+            .Append("<th>Source branch</th><th>Target branch</th><th>Approved by</th><th>Closed by</th></tr></thead><tbody>");
+        foreach (var pr in report.PullRequests ?? [])
+            sb.Append("<tr><td>").Append(pr.PrId).Append("</td><td>").Append(E(pr.Title))
+                .Append("</td><td>").Append(E(pr.CreatedBy)).Append("</td><td>")
+                .Append(E(pr.SourceBranch)).Append("</td><td>").Append(E(pr.TargetBranch))
+                .Append("</td><td>").Append(E(string.IsNullOrEmpty(pr.ApprovedBy) ? "—" : pr.ApprovedBy))
+                .Append("</td><td>").Append(E(string.IsNullOrEmpty(pr.ClosedBy) ? "—" : pr.ClosedBy))
+                .Append("</td></tr>");
+        return sb.Append("</tbody></table></div></section>").ToString();
     }
 
     /// <summary>Offline SVG trend above KPIs; switches units instead of mixing counts and days.</summary>
@@ -411,6 +460,22 @@ public static class DevelopmentMetrics
         }
         Console.Error.WriteLine($"Matched {matched.Count} pull requests; unlinked candidates: {unlinked}. Calculating KPIs...");
         var report = Aggregate(project, displayedArea, months, DateTimeOffset.UtcNow, matched, unlinked);
+        Console.Error.WriteLine($"Fetching commit counts for {matched.Count} PRs...");
+        var inventory = new List<PrDetail>();
+        var commitErrors = 0;
+        for (var i = 0; i < matched.Count; i++)
+        {
+            var pr = matched[i];
+            int? commitCount;
+            try { commitCount = (await ctx.Client.GetPullRequestCommitsAsync(pr)).Count; }
+            catch (AdoException) { commitCount = null; commitErrors++; }
+            inventory.Add(Detail(pr, commitCount));
+            if ((i + 1) % 25 == 0 || i + 1 == matched.Count)
+                Console.Error.WriteLine($"Commit counts: {i + 1}/{matched.Count} PRs checked");
+        }
+        if (commitErrors > 0)
+            Console.Error.WriteLine($"Warning: commit counts unavailable for {commitErrors} PRs.");
+        report = WithPullRequests(report, inventory);
         Console.Error.WriteLine($"Rendering {format.ToUpperInvariant()} report...");
         var output = format == "json" ? JsonSerializer.Serialize(report, Json.Options) + "\n" : Html(report);
         if (ctx.Args.Get("--output") is { } path)

@@ -51,7 +51,8 @@ public sealed record PullRequest(
     CommitRef? LastMergeTargetCommit,
     List<Reviewer>? Reviewers,
     DateTimeOffset? CreationDate = null,
-    DateTimeOffset? ClosedDate = null);
+    DateTimeOffset? ClosedDate = null,
+    IdentityRef? ClosedBy = null);
 
 /// <summary>Work item fields are kept raw: their set and shape depend on the process template.</summary>
 public sealed record WorkItem(int Id, Dictionary<string, JsonElement> Fields)

@@ -10,13 +10,15 @@ using AdoCli.Api;
 public static class DevelopmentMetrics
 {
     public sealed record Month(string Period, int Opened, int Closed, double? AverageDays);
+    public sealed record TestMetrics(int UserStories, int UserStoriesWithoutTests, int LinkedUserStories,
+        int TestCases, int TestPlans, int UnassignedTestCases);
     public sealed record PrDetail(int PrId, string Title, string CreatedBy, string SourceBranch, string TargetBranch, int? Commits, string ApprovedBy = "", string ClosedBy = "");
     public sealed record Report(string Format, string Project, string Area, DateTimeOffset GeneratedAt,
         int Months, int MatchedPullRequests, int UnlinkedPullRequests, int Opened, int Closed,
         double? AverageDays, IReadOnlyList<Month> Timeline,
         int Merged = 0, int Abandoned = 0, int OpenAtEnd = 0, double? MedianDays = null,
         int Commits = 0, double? AverageCommitsPerPr = null, int CommitCountUnavailable = 0,
-        IReadOnlyList<PrDetail>? PullRequests = null);
+        IReadOnlyList<PrDetail>? PullRequests = null, TestMetrics? Tests = null);
 
     public static Report Aggregate(string project, string area, int months, DateTimeOffset generatedAt,
         IEnumerable<PullRequest> matched, int unlinked)
@@ -40,6 +42,50 @@ public static class DevelopmentMetrics
             observedClosed.Count(p => p.Status.Equals("abandoned", StringComparison.OrdinalIgnoreCase)),
             prs.Count(p => p.CreationDate is { } created && created < end &&
                 (p.ClosedDate is null || p.ClosedDate >= end)), MedianDays(observedClosed));
+    }
+
+    /// <summary>Area-scoped test inventory at report generation time; test plans count when they contain at least one test case from the area.</summary>
+    public static async Task<TestMetrics> CollectTestMetricsAsync(AdoClient client, string project, string area, Action<string>? progress = null)
+    {
+        area = NormalizeAreaPath(area);
+        var storyIds = (await client.QueryWorkItemIdsAsync(project, new WorkItemFilter
+        {
+            Everyone = true, Area = area, States = ["any"], Types = ["User Story"]
+        })).Distinct().ToList();
+        var testIds = (await client.QueryWorkItemIdsAsync(project, new WorkItemFilter
+        {
+            Everyone = true, Area = area, States = ["any"], Types = ["Test Case"]
+        })).ToHashSet();
+        progress?.Invoke($"Found {storyIds.Count} user stories and {testIds.Count} test cases in {area}.");
+        var uncovered = 0;
+        foreach (var id in storyIds)
+        {
+            var story = await client.GetWorkItemWithRelationsAsync(id);
+            if (!(story.Relations ?? []).Any(r => TestPlanCoverage.IsTestLink(r)
+                && TestPlanCoverage.LinkedId(r.Url) is { } caseId && testIds.Contains(caseId)))
+                uncovered++;
+        }
+        var plans = await client.GetTestPlansAsync(project);
+        var matchingPlans = 0;
+        var assignedCases = new HashSet<int>();
+        foreach (var plan in plans)
+        {
+            var hasCases = false;
+            foreach (var suite in await client.GetTestSuitesAsync(project, plan.Id))
+            {
+                var ids = await client.GetSuiteTestCaseIdsAsync(project, plan.Id, suite.Id);
+                foreach (var id in ids)
+                    if (testIds.Contains(id))
+                    {
+                        assignedCases.Add(id);
+                        hasCases = true;
+                    }
+            }
+            if (hasCases) matchingPlans++;
+        }
+        progress?.Invoke($"Checked {plans.Count} plans; {matchingPlans} include test cases from the area.");
+        return new(storyIds.Count, uncovered, storyIds.Count - uncovered,
+            testIds.Count, matchingPlans, testIds.Count - assignedCases.Count);
     }
 
     /// <summary>Attach PR inventory and total commit count; unavailable counts are excluded from the average.</summary>
@@ -175,7 +221,22 @@ public static class DevelopmentMetrics
             ("Avg commits/PR", V(report.AverageCommitsPerPr))
         })
             sb.Append("<div class=\"kpi\"><strong>").Append(E(value)).Append("</strong><span>").Append(E(name)).Append("</span></div>");
-        sb.Append("</div><h2>Monthly pull requests</h2><div class=\"legend\"><span><i class=\"swatch opened\"></i>Opened</span><span><i class=\"swatch closed\"></i>Closed</span></div>")
+        sb.Append("</div>");
+        if (report.Tests is { } tests)
+        {
+            sb.Append("<h2>Tests &amp; coverage</h2><p class=\"muted\">Area Path snapshot at report generation time; test links and plan assignments are not limited to the PR date range.</p><div class=\"kpis\">");
+            foreach (var (name, value) in new[] {
+                ("User stories", tests.UserStories),
+                ("Stories without test cases", tests.UserStoriesWithoutTests),
+                ("Stories with test cases", tests.LinkedUserStories),
+                ("Test cases", tests.TestCases),
+                ("Test plans", tests.TestPlans),
+                ("Test cases outside plans", tests.UnassignedTestCases)
+            })
+                sb.Append("<div class=\"kpi\"><strong>").Append(value).Append("</strong><span>").Append(E(name)).Append("</span></div>");
+            sb.Append("</div>");
+        }
+        sb.Append("<h2>Monthly pull requests</h2><div class=\"legend\"><span><i class=\"swatch opened\"></i>Opened</span><span><i class=\"swatch closed\"></i>Closed</span></div>")
             .Append("<div class=\"scroll\"><table><thead><tr><th>Month (UTC)</th><th>Opened</th><th>Closed</th><th>Average days to close</th><th>Volume</th></tr></thead><tbody>");
         foreach (var m in report.Timeline)
         {
@@ -555,6 +616,13 @@ public static class DevelopmentMetrics
         if (commitErrors > 0)
             Console.Error.WriteLine($"Warning: commit counts unavailable for {commitErrors} PRs.");
         report = WithPullRequests(report, inventory);
+        if (scope == "area")
+        {
+            var selectedAreaForTests = area ?? throw AdoException.Usage("--area is required for test coverage");
+            Console.Error.WriteLine("Collecting area test coverage metrics...");
+            report = report with { Tests = await CollectTestMetricsAsync(ctx.Client, project, selectedAreaForTests,
+                message => Console.Error.WriteLine(message)) };
+        }
         Console.Error.WriteLine($"Rendering {format.ToUpperInvariant()} report...");
         var output = format == "json" ? JsonSerializer.Serialize(report, Json.Options) + "\n" : Html(report);
         if (ctx.Args.Get("--output") is { } path)

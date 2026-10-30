@@ -10,7 +10,7 @@ using AdoCli.Api;
 public static class DevelopmentMetrics
 {
     public sealed record Month(string Period, int Opened, int Closed, double? AverageDays);
-    public sealed record PrDetail(int PrId, string Title, string CreatedBy, string SourceBranch, string TargetBranch, int? Commits);
+    public sealed record PrDetail(int PrId, string Title, string CreatedBy, string SourceBranch, string TargetBranch, int? Commits, string ApprovedBy = "", string ClosedBy = "");
     public sealed record Report(string Format, string Project, string Area, DateTimeOffset GeneratedAt,
         int Months, int MatchedPullRequests, int UnlinkedPullRequests, int Opened, int Closed,
         double? AverageDays, IReadOnlyList<Month> Timeline,
@@ -58,7 +58,10 @@ public static class DevelopmentMetrics
     }
 
     public static PrDetail Detail(PullRequest pr, int? commits) =>
-        new(pr.PullRequestId, pr.Title, pr.CreatedBy.DisplayName, pr.SourceRefName, pr.TargetRefName, commits);
+        new(pr.PullRequestId, pr.Title, pr.CreatedBy.DisplayName, pr.SourceRefName, pr.TargetRefName, commits,
+            string.Join(", ", (pr.Reviewers ?? []).Where(r => r.Vote is 10 or 5)
+                .Select(r => r.DisplayName).Distinct(StringComparer.OrdinalIgnoreCase)),
+            pr.ClosedBy?.DisplayName ?? "");
 
     public static double? AverageDays(IEnumerable<PullRequest> prs)
     {
@@ -204,11 +207,14 @@ public static class DevelopmentMetrics
             .Append("Commit counts represent commits associated with each PR; missing counts are excluded from the average. ")
             .Append("Unavailable commit counts: ").Append(report.CommitCountUnavailable).Append(".</p>")
             .Append("<div class=\"scroll\"><table><thead><tr><th>PR ID</th><th>Title</th><th>Created by</th>")
-            .Append("<th>Source branch</th><th>Target branch</th></tr></thead><tbody>");
+            .Append("<th>Source branch</th><th>Target branch</th><th>Approved by</th><th>Closed by</th></tr></thead><tbody>");
         foreach (var pr in report.PullRequests ?? [])
             sb.Append("<tr><td>").Append(pr.PrId).Append("</td><td>").Append(E(pr.Title))
                 .Append("</td><td>").Append(E(pr.CreatedBy)).Append("</td><td>")
-                .Append(E(pr.SourceBranch)).Append("</td><td>").Append(E(pr.TargetBranch)).Append("</td></tr>");
+                .Append(E(pr.SourceBranch)).Append("</td><td>").Append(E(pr.TargetBranch))
+                .Append("</td><td>").Append(E(string.IsNullOrEmpty(pr.ApprovedBy) ? "—" : pr.ApprovedBy))
+                .Append("</td><td>").Append(E(string.IsNullOrEmpty(pr.ClosedBy) ? "—" : pr.ClosedBy))
+                .Append("</td></tr>");
         return sb.Append("</tbody></table></div></section>").ToString();
     }
 

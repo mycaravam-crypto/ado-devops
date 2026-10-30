@@ -227,7 +227,7 @@ public static class DevelopmentMetrics
         {
             var month = report.Timeline[i];
             var date = DateTime.ParseExact(month.Period, "yyyy-MM", CultureInfo.InvariantCulture);
-            var label = date.ToString("MMM", CultureInfo.GetCultureInfo("en-US"));
+            var label = new[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }[date.Month - 1];
             if (date.Month == 1 || i == 0) label += " " + date.Year.ToString(CultureInfo.InvariantCulture);
             var x = (40 + i * 680.0 / labelSpan).ToString("0.##", CultureInfo.InvariantCulture);
             sb.Append("<text x=\"").Append(x).Append("\" y=\"200\" font-size=\"11\" text-anchor=\"middle\" fill=\"currentColor\">")

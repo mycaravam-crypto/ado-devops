@@ -234,7 +234,7 @@ public static class DevelopmentMetrics
                 .Append(label).Append("</text>");
         }
         sb.Append("""
-            </svg><p class="muted">Monthly UTC trend · select a metric to compare months. Exact values are listed below.</p>
+            </svg><p class="muted" id="top-trend-status" aria-live="polite">Opened PRs · monthly values</p><p class="muted">Monthly UTC trend · select a metric to compare months. Exact values are listed below.</p>
             </section>
             <style>
             .top-trend{margin:24px 0;padding:20px;border:1px solid var(--line);border-radius:10px}
@@ -259,6 +259,12 @@ public static class DevelopmentMetrics
                   if (group.dataset.series === selected) group.removeAttribute("hidden");
                   else group.setAttribute("hidden", "");
                 });
+                const current = groups.find(group => group.dataset.series === selected);
+                const labels = {opened: 'Opened PRs', closed: 'Closed PRs', duration: 'Average days to close'};
+                const status = section.querySelector('#top-trend-status');
+                if (status) status.textContent = (labels[selected] || selected) +
+                  (current && current.querySelectorAll('circle').length > 0
+                    ? ' · monthly values' : ' · no data for this period');
               }));
             })();
             </script>

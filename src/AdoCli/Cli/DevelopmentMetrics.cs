@@ -44,6 +44,11 @@ public static class DevelopmentMetrics
                 (p.ClosedDate is null || p.ClosedDate >= end)), MedianDays(observedClosed));
     }
 
+    /// <summary>Tested-By links count even when a test case belongs to another Area Path.</summary>
+    public static HashSet<int> LinkedTestCaseIds(WorkItem story) =>
+        (story.Relations ?? []).Where(TestPlanCoverage.IsTestLink)
+            .Select(r => TestPlanCoverage.LinkedId(r.Url)).OfType<int>().ToHashSet();
+
     /// <summary>Area-scoped test inventory at report generation time; test plans count when they contain at least one test case from the area.</summary>
     public static async Task<TestMetrics> CollectTestMetricsAsync(AdoClient client, string project, string area, Action<string>? progress = null)
     {
@@ -63,10 +68,7 @@ public static class DevelopmentMetrics
         foreach (var id in storyIds)
         {
             var story = await client.GetWorkItemWithRelationsAsync(id);
-            var linked = (story.Relations ?? [])
-                .Where(TestPlanCoverage.IsTestLink)
-                .Select(r => TestPlanCoverage.LinkedId(r.Url))
-                .OfType<int>().ToHashSet();
+            var linked = LinkedTestCaseIds(story);
             if (linked.Count == 0) uncovered++;
             linkedCaseIds.UnionWith(linked);
         }

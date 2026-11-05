@@ -53,6 +53,32 @@ Field options, for both `create` and `edit`:
 - `workitem edit` changes only the fields given. The server checks the values: an unknown state,
   user or field fails with its message and exit code 1. `--json` prints the updated work item.
 
+## Templates
+
+Work item templates are saved field values for one work item type, e.g. a User Story with an acceptance criteria
+skeleton or a Test Case with a priority and tags. They belong to a team: `--team <name>`, by default the project's
+default team. Templates are named by id or by name (ignoring case).
+
+```bash
+ado workitem template list --type "User Story"
+ado workitem template show "Standard story"           # the template and every field value it sets
+ado workitem template create --name "Standard story" --type "User Story" \
+  --title "As a <role>, I want <goal>" --field Microsoft.VSTS.Scheduling.StoryPoints=3 \
+  --template-description "Default story for refinement"
+ado workitem template edit "Standard story" --tags needs-refinement --remove-field Microsoft.VSTS.Scheduling.StoryPoints
+ado workitem template delete "Standard story" --yes
+ado workitem create --template "Standard story" --title "As a tester, I want reports"
+```
+
+- `template create` and `template edit` take the [field options](#work-items) above; `--description` sets the work
+  item's `System.Description`, `--template-description` the template's own description.
+- `template edit` keeps every field it is not told to change; `--remove-field <ref>` (repeatable) stops setting one,
+  `--name` renames the template.
+- `template delete` asks first; `--yes` skips the question and is required when stdin is not a terminal.
+- `workitem create --template` takes the type and the field values from the template, then applies the field options
+  on top. The title comes from `--title` or the template. `--type`, if given, must match the template's type.
+- Templates hold field values only, no links or attachments. When two templates share a name, use the id.
+
 ## Changing many work items at once
 
 `workitem edit` takes several ids, or `-` to read them from stdin, so a filtered list can be edited in one go:

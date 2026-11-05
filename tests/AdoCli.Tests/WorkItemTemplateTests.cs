@@ -66,7 +66,8 @@ public class WorkItemTemplateTests
 
         Assert.Equal(0, code);
         Assert.Equal("https://tfs/_apis/projects/Platform?api-version=5.0", stub.Requests[0].Url);
-        Assert.Equal("https://tfs/Platform/Platform%20Team/_apis/wit/templates?workitemtypename=User%20Story&api-version=5.0-preview.1", stub.Requests[1].Url);
+        // The stub records Uri.ToString(), which shows %20 as a space.
+        Assert.Equal("https://tfs/Platform/Platform Team/_apis/wit/templates?workitemtypename=User Story&api-version=5.0-preview.1", stub.Requests[1].Url);
         Assert.Contains("Standard story", output);
         Assert.Contains("2 templates of team Platform Team", output);
     }
@@ -210,7 +211,7 @@ public class WorkItemTemplateTests
 
         Assert.Equal(0, code);
         var request = stub.Requests[2];
-        Assert.Equal("https://tfs/Platform/_apis/wit/workitems/$User%20Story?api-version=5.0", request.Url);
+        Assert.Equal("https://tfs/Platform/_apis/wit/workitems/$User Story?api-version=5.0", request.Url);
         var patch = JsonNode.Parse(request.Body!)!.AsArray().ToDictionary(op => (string)op!["path"]!, op => (string)op!["value"]!);
         Assert.Equal("As a tester", patch["/fields/System.Title"]);
         Assert.Equal("8", patch["/fields/Microsoft.VSTS.Scheduling.StoryPoints"]);

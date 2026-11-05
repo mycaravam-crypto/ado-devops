@@ -143,6 +143,8 @@ public static partial class WorkItemCommands
     {
         var project = ctx.RequireProject();
         var a = ctx.Args;
+        if (a.Get("--template") is { } template)
+            return await CreateFromTemplateAsync(ctx, template);
         string type, title, description;
         if (a.Get("--title") is { } t)
         {
@@ -166,6 +168,38 @@ public static partial class WorkItemCommands
         if (description.Length > 0)
             fields["System.Description"] = Html(description);
 
+        return await CreateWithFieldsAsync(ctx, project, type, fields);
+    }
+
+    /// <summary>
+    /// ado workitem create --template &lt;name|id&gt;: the template's type and field values, overridden by the field options.
+    /// The title comes from --title or the template; nothing is prompted for.
+    /// </summary>
+    static async Task<int> CreateFromTemplateAsync(Context ctx, string nameOrId)
+    {
+        var a = ctx.Args;
+        var (project, team) = await WorkItemTemplateCommands.TeamAsync(ctx);
+        var template = await WorkItemTemplateCommands.ResolveAsync(ctx.Client, project, team, nameOrId);
+        if (a.Get("--type") is { } type && !type.Equals(template.WorkItemTypeName, StringComparison.OrdinalIgnoreCase))
+            throw AdoException.Usage($"template '{template.Name}' is for {template.WorkItemTypeName}, not {type}; leave out --type");
+
+        var fields = TemplateFields(template, Fields(a));
+        if (!fields.TryGetValue("System.Title", out var title) || string.IsNullOrWhiteSpace(title))
+            throw AdoException.Usage($"template '{template.Name}' sets no title; pass --title");
+        return await CreateWithFieldsAsync(ctx, project, template.WorkItemTypeName, fields);
+    }
+
+    /// <summary>The template's field values with <paramref name="overrides"/> on top; field names match ignoring case.</summary>
+    public static Dictionary<string, string> TemplateFields(WorkItemTemplate template, IReadOnlyDictionary<string, string> overrides)
+    {
+        var fields = new Dictionary<string, string>(template.Fields ?? [], StringComparer.OrdinalIgnoreCase);
+        foreach (var (name, value) in overrides)
+            fields[name] = value;
+        return fields;
+    }
+
+    static async Task<int> CreateWithFieldsAsync(Context ctx, string project, string type, IReadOnlyDictionary<string, string> fields)
+    {
         var w = await ctx.Client.CreateWorkItemAsync(project, type, fields);
         if (ctx.Json)
             return Output.WriteJson(w);

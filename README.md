@@ -51,6 +51,7 @@ elsewhere pass `--project` and `--repo`. `ado <command> --help` lists every opti
 | `commit context <commit>` | A commit and the work items the server links to it, as JSON (`ado.commit-context/v1`) |
 | `workitem list` | Your open items; filters `--all`, `--type`, `--state`, `--tag`, `--area`, `--contains`, `--wiql`, `--ids` |
 | `workitem show\|create\|edit` | One item; `edit` takes several ids or `-` (stdin) for bulk changes, `--dry-run` previews |
+| `workitem template list\|show\|create\|edit\|delete` | Team work item templates (`--team`, default: the project's default team); `workitem create --template <name>` applies one |
 | `workitem context <id>` | Description, acceptance criteria and parent/child/related links as JSON (`--revision n`) |
 | `workitem search <query>` | Typo-tolerant title search, ranked |
 | `testplan list\|show` | Test plans, suite hierarchy, steps (`--with details`) and run outcomes (`--with results`) |

@@ -16,7 +16,7 @@ public static class Help
           repo      list, show, clone, status
           pr        list, show, context, diff, checkout, create, approve, merge
           commit    context
-          workitem  list, show, create, edit
+          workitem  list, show, create, edit, template
           testplan  list, show, export, import, coverage, progress, report, trace-export
           metrics   monthly PR throughput and duration dashboard by Area Path
           build     list, show, run
@@ -181,6 +181,20 @@ public static class Help
               --json                    as JSON (schema ado.workitem-search/v1)
           ado workitem create           create a work item; prompts unless --type and --title are given
           ado workitem edit <id>...     change fields of one or more work items; - reads ids from stdin
+          ado workitem template list    work item templates of the team (--type <type> narrows down)
+          ado workitem template show <name|id>
+                                        a template and the field values it sets
+          ado workitem template create --name <n> --type <type> [fields]
+                                        a template that sets the given fields (see Fields below)
+          ado workitem template edit <name|id> [fields]
+                                        change field values; others are kept
+              --name <n>                rename
+              --remove-field <ref>      stop setting this field; can be repeated
+          ado workitem template delete <name|id> [--yes]
+
+        Templates belong to a team:
+          --team <name>                 the team; default: the project's default team
+          --template-description <d>    (template create/edit) what the template is for
 
         list filters (all must match):
           --all                         everyone's items, not just yours
@@ -197,6 +211,8 @@ public static class Help
 
         Fields, for create and edit:
           --type <type>                 (create only) e.g. Bug, Task, "User Story"
+          --template <name|id>          (create only) start from a template's type and values;
+                                        the other options override them
           --title <t>  --description <d>  --state <s>  --assigned-to <who> ("" unassigns)
           --area <path>  --iteration <path>  --tags "a; b" (replaces existing tags)
           --comment <text>              add a comment to the discussion
@@ -215,6 +231,9 @@ public static class Help
           ado workitem search "login fehler" --type Bug
           ado workitem list --all --state any --contains timeout
           ado workitem create --type Task --title "Update docs" --field Microsoft.VSTS.Common.Priority=2
+          ado workitem template create --name "Standard story" --type "User Story" \
+            --title "As a <role>, I want <goal>" --field Microsoft.VSTS.Scheduling.StoryPoints=3
+          ado workitem create --template "Standard story" --title "As a tester, I want reports"
           ado workitem edit 4711 --state Active --assigned-to jane@company.local --comment "Picked up"
           ado workitem list --all --type Bug --tag xyz --ids | ado workitem edit - --state Closed --yes
           ado workitem list --all --state any --title-contains abc --ids |

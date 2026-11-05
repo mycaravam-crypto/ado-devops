@@ -87,6 +87,19 @@ public class WorkItemTemplateTests
     }
 
     [Fact]
+    public void FieldDisplayShowsNullValuesAsEmpty()
+    {
+        var template = System.Text.Json.JsonSerializer.Deserialize<WorkItemTemplate>(
+            """{"id":"11111111-1111-1111-1111-111111111111","name":"T","workItemTypeName":"Bug","fields":{"System.Tags":null,"System.Title":"<b>x</b>"}}""",
+            Json.Options)!;
+
+        var (rows, blocks) = WorkItemTemplateCommands.FieldDisplay(template.Fields!);
+
+        Assert.Equal(new[] { "System.Tags", "" }, Assert.Single(rows));
+        Assert.Equal(("System.Title", "x"), Assert.Single(blocks));
+    }
+
+    [Fact]
     public async Task UnknownNameIsNotFound()
     {
         var stub = new StubHandler(HttpStatusCode.OK, TemplateList);

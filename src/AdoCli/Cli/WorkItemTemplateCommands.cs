@@ -182,8 +182,10 @@ public static class WorkItemTemplateCommands
     {
         var rows = new List<string[]>();
         var blocks = new List<(string, string)>();
-        foreach (var (name, value) in fields.OrderBy(f => f.Key, StringComparer.OrdinalIgnoreCase))
+        foreach (var (name, raw) in fields.OrderBy(f => f.Key, StringComparer.OrdinalIgnoreCase))
         {
+            // A JSON null deserializes to a null string despite the declared type.
+            var value = raw ?? "";
             var html = value.Contains('<') && value.Contains('>');
             var text = html ? WorkItemCommands.PlainText(value) : value.Trim();
             if (html || text.Contains('\n'))

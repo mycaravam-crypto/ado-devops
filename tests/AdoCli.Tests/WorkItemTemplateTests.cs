@@ -19,7 +19,7 @@ public class WorkItemTemplateTests
 
     const string StoryTemplate = $$"""
         {"id":"{{StoryId}}","name":"Standard story","description":"Default story","workItemTypeName":"User Story",
-         "fields":{"System.Title":"As a <role>","Microsoft.VSTS.Scheduling.StoryPoints":"3","System.Tags":"refine"}}
+         "fields":{"System.Title":"As a <role>","Microsoft.VSTS.Scheduling.StoryPoints":"3","System.Tags":"refine"} }
         """;
 
     static Context Ctx(StubHandler stub, params string[] argv) =>

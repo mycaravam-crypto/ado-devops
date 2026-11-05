@@ -253,6 +253,42 @@ public sealed class AdoClient
     static object[] FieldPatch(IReadOnlyDictionary<string, string> fields) =>
         fields.Select(f => (object)new { op = "add", path = "/fields/" + f.Key, value = f.Value }).ToArray();
 
+    /// <summary>A project by name or id, with its default team.</summary>
+    public Task<Project> GetProjectAsync(string project) =>
+        SendAsync<Project>(HttpMethod.Get, Url(null, $"projects/{Uri.EscapeDataString(project)}"));
+
+    /// <summary>{server}/{project}/{team}/_apis/{path}: work item templates belong to a team, not to the project.</summary>
+    public string TeamUrl(string project, string team, string path, string query = "")
+    {
+        var q = query.Length > 0 ? query + "&" : "";
+        return $"{_server}/{Uri.EscapeDataString(project)}/{Uri.EscapeDataString(team)}/_apis/{path}?{q}api-version={TemplatesApiVersion}";
+    }
+
+    // The templates resource is still marked preview on some versions; a "-preview" request is accepted either way.
+    string TemplatesApiVersion => _apiVersion.Contains("-preview") ? _apiVersion : _apiVersion + "-preview.1";
+
+    /// <summary>The team's work item templates, without their fields; only those for <paramref name="type"/> when given.</summary>
+    public async Task<List<WorkItemTemplate>> GetWorkItemTemplatesAsync(string project, string team, string? type = null) =>
+        (await SendAsync<ListResponse<WorkItemTemplate>>(HttpMethod.Get, TeamUrl(project, team, "wit/templates",
+            type is null ? "" : $"workitemtypename={Uri.EscapeDataString(type)}"))).Value;
+
+    /// <summary>A template with its field values.</summary>
+    public Task<WorkItemTemplate> GetWorkItemTemplateAsync(string project, string team, Guid id) =>
+        SendAsync<WorkItemTemplate>(HttpMethod.Get, TeamUrl(project, team, $"wit/templates/{id}"));
+
+    public Task<WorkItemTemplate> CreateWorkItemTemplateAsync(string project, string team, WorkItemTemplate template) =>
+        SendAsync<WorkItemTemplate>(HttpMethod.Post, TeamUrl(project, team, "wit/templates"), TemplateBody(template));
+
+    /// <summary>Replaces name, description and every field of the template with id <paramref name="template"/>.Id.</summary>
+    public Task<WorkItemTemplate> ReplaceWorkItemTemplateAsync(string project, string team, WorkItemTemplate template) =>
+        SendAsync<WorkItemTemplate>(HttpMethod.Put, TeamUrl(project, team, $"wit/templates/{template.Id}"), TemplateBody(template));
+
+    public Task DeleteWorkItemTemplateAsync(string project, string team, Guid id) =>
+        SendNoContentAsync(HttpMethod.Delete, TeamUrl(project, team, $"wit/templates/{id}"));
+
+    static object TemplateBody(WorkItemTemplate t) =>
+        new { name = t.Name, description = t.Description ?? "", workItemTypeName = t.WorkItemTypeName, fields = t.Fields ?? [] };
+
     // The legacy "test" area uses REST API 5.0 on Azure DevOps Server 2020 (Dev18.M170).
     // Keep this independent of the global version used by Git, WIT and Build endpoints.
     const string LegacyTestApiVersion = "5.0";
@@ -344,20 +380,7 @@ public sealed class AdoClient
     /// <summary>Sends one request, with <paramref name="body"/> serialized as JSON under <paramref name="contentType"/> (JSON Patch for work items), and deserializes the JSON answer; HTTP errors and rejected credentials become an <see cref="AdoException"/> with a matching exit code. <paramref name="onResponse"/> sees the successful response first, e.g. to read paging headers.</summary>
     public async Task<T> SendAsync<T>(HttpMethod method, string url, object? body = null, string contentType = "application/json", Action<HttpResponseMessage>? onResponse = null)
     {
-        using var request = new HttpRequestMessage(method, url);
-        if (body is not null)
-            request.Content = new StringContent(JsonSerializer.Serialize(body, Json.Options), Encoding.UTF8, contentType);
-
-        var sw = Stopwatch.StartNew();
-        using var response = await _http.SendAsync(request);
-        if (_debug)
-            Console.Error.WriteLine($"{method} {url} -> {(int)response.StatusCode} ({sw.ElapsedMilliseconds} ms)");
-
-        if (!response.IsSuccessStatusCode)
-            throw await ErrorAsync(response);
-        // Azure DevOps answers a rejected credential with a 203 HTML sign-in page.
-        if (response.StatusCode == HttpStatusCode.NonAuthoritativeInformation)
-            throw AuthFailed();
+        using var response = await SendCoreAsync(method, url, body, contentType);
         onResponse?.Invoke(response);
         try
         {
@@ -368,6 +391,38 @@ public sealed class AdoClient
         {
             throw new AdoException($"unexpected response from Azure DevOps Server ({method} {Path(url)}): {e.Message}");
         }
+    }
+
+    /// <summary>Like <see cref="SendAsync{T}"/> for requests whose answer has no body worth reading, e.g. a DELETE (204).</summary>
+    public async Task SendNoContentAsync(HttpMethod method, string url, object? body = null)
+    {
+        using var response = await SendCoreAsync(method, url, body, "application/json");
+    }
+
+    /// <summary>Sends one request; the caller disposes the successful response. Errors become an <see cref="AdoException"/>.</summary>
+    async Task<HttpResponseMessage> SendCoreAsync(HttpMethod method, string url, object? body, string contentType)
+    {
+        using var request = new HttpRequestMessage(method, url);
+        if (body is not null)
+            request.Content = new StringContent(JsonSerializer.Serialize(body, Json.Options), Encoding.UTF8, contentType);
+
+        var sw = Stopwatch.StartNew();
+        var response = await _http.SendAsync(request);
+        if (_debug)
+            Console.Error.WriteLine($"{method} {url} -> {(int)response.StatusCode} ({sw.ElapsedMilliseconds} ms)");
+
+        if (!response.IsSuccessStatusCode)
+        {
+            using (response)
+                throw await ErrorAsync(response);
+        }
+        // Azure DevOps answers a rejected credential with a 203 HTML sign-in page.
+        if (response.StatusCode == HttpStatusCode.NonAuthoritativeInformation)
+        {
+            response.Dispose();
+            throw AuthFailed();
+        }
+        return response;
     }
 
     // The path of a URL for messages; the query is left out.

@@ -144,3 +144,14 @@ public sealed record TestPointCaseRef(string Id);
 
 public sealed record TestRunInfo(int Id, DateTimeOffset? StartedDate, DateTimeOffset? CompletedDate);
 public sealed record TestResultInfo(int Id, IdRef? TestCase, string? Outcome, string? State, string? ErrorMessage);
+
+/// <summary>
+/// A work item template of a team: a name, the work item type it is for and preset field values, keyed by reference name.
+/// Lists return templates without <see cref="Fields"/>; the server stores every value as a string.
+/// </summary>
+public sealed record WorkItemTemplate(Guid Id, string Name, string? Description, string WorkItemTypeName, Dictionary<string, string>? Fields = null);
+
+/// <summary>A team, e.g. the default team of a project.</summary>
+public sealed record TeamRef(Guid Id, string Name);
+
+public sealed record Project(Guid Id, string Name, TeamRef? DefaultTeam);
